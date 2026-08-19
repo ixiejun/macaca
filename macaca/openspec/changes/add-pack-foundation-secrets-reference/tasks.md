@@ -87,12 +87,12 @@
 - [x] 5.3 Add SDK helpers for metadata inspection, purpose binding, provider
   resolution request building, lease renew/revoke, rotation request, audit access,
   and unavailable diagnostics.
-- [ ] 5.4 Extend effective capability projection so applications can inspect
+- [x] 5.4 Extend effective capability projection so applications can inspect
   callable commands, denied commands, unavailable providers, reference states,
   provider capability flags, and replay references.
-- [ ] 5.5 Expose WASM host imports only for declared callable reference commands
+- [x] 5.5 Expose WASM host imports only for declared callable reference commands
   and never expose raw secret values or provider-private locators.
-- [ ] 5.6 Add app-framework tests proving YAML, WASM, GenUI, and headless apps all
+- [x] 5.6 Add app-framework tests proving YAML, WASM, GenUI, and headless apps all
   use the same secret-reference execution path.
 
 ## 6. Trace, Audit, Replay, And Gates
@@ -105,9 +105,9 @@
   prompts, manifests, and unbounded output do not enter observability surfaces.
 - [ ] 6.3 Add replay tests proving secret-reference commands are trace-addressable
   and can reconstruct decisions without revealing raw secret values.
-- [ ] 6.4 Add dependency-boundary tests proving kernel, SDK, shells, and
+- [x] 6.4 Add dependency-boundary tests proving kernel, SDK, shells, and
   application framework do not import concrete secret providers.
-- [ ] 6.5 Add no-direct-provider-call gates proving SDK helpers and WASM host
+- [x] 6.5 Add no-direct-provider-call gates proving SDK helpers and WASM host
   imports cannot bypass service runtime.
 - [ ] 6.6 Run `openspec validate add-pack-foundation-secrets-reference --strict`,
   targeted cargo tests, dependency-boundary gates, file-size gates, and audit

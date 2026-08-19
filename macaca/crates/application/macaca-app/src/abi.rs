@@ -10,10 +10,11 @@ use std::sync::Arc;
 
 use macaca_proto::{
     expand_service_capabilities, validate_filesystem_root_declarations,
-    validate_key_value_namespace_declarations, ApplicationAbiDeclaration, ApplicationAbiError,
-    ApplicationCheckpoint, ApplicationExport, ApplicationHostCommandResult,
-    ApplicationHostCommandStatus, ApplicationLifecycleState, DomainPackCatalog,
-    EffectiveServiceCapabilities, InMemoryDomainPackCatalog, PackageDescriptor, PackageRuntimeKind,
+    validate_key_value_namespace_declarations, validate_secret_reference_declarations,
+    ApplicationAbiDeclaration, ApplicationAbiError, ApplicationCheckpoint, ApplicationExport,
+    ApplicationHostCommandResult, ApplicationHostCommandStatus, ApplicationLifecycleState,
+    DomainPackCatalog, EffectiveServiceCapabilities, InMemoryDomainPackCatalog, PackageDescriptor,
+    PackageRuntimeKind,
 };
 use tracing::{info, warn};
 
@@ -150,6 +151,10 @@ impl ApplicationAbiAdapter for YamlApplicationAbiAdapter {
             })?;
             validate_key_value_namespace_declarations(service_contract).map_err(|reason| {
                 warn!(application_id = %application_id, reason, "application ABI key-value namespace admission rejected");
+                ApplicationAbiError::InvalidDeclaration(reason.into())
+            })?;
+            validate_secret_reference_declarations(service_contract).map_err(|reason| {
+                warn!(application_id = %application_id, reason, "application ABI secret reference admission rejected");
                 ApplicationAbiError::InvalidDeclaration(reason.into())
             })?;
         }
@@ -367,6 +372,10 @@ mod foundation_filesystem_tests;
 #[cfg(test)]
 #[path = "abi_foundation_key_value_state_tests.rs"]
 mod foundation_key_value_state_tests;
+
+#[cfg(test)]
+#[path = "abi_foundation_secrets_reference_tests.rs"]
+mod foundation_secrets_reference_tests;
 
 #[cfg(test)]
 #[path = "abi_time_tests.rs"]
