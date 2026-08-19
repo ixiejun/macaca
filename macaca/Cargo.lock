@@ -1581,6 +1581,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "macaca-foundation-secrets-reference"
+version = "0.1.0"
+dependencies = [
+ "async-trait",
+ "macaca-proto",
+ "serde",
+ "serde_json",
+ "tokio",
+ "tracing",
+]
+
+[[package]]
 name = "macaca-framework"
 version = "0.1.0"
 dependencies = [

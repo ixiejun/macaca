@@ -62,12 +62,12 @@
 
 ## 4. Service Provider And Runtime Integration
 
-- [ ] 4.1 Define the secret-reference service trait/provider interface behind the
+- [x] 4.1 Define the secret-reference service trait/provider interface behind the
   service runtime.
 - [x] 4.2 Implement unavailable provider behavior for absent secret service,
   missing reference, unsupported lease/rotation/version/audit behavior, and
   missing entitlement.
-- [ ] 4.3 Implement deterministic mock provider that returns references, leases,
+- [x] 4.3 Implement deterministic mock provider that returns references, leases,
   and diagnostics without creating real secrets.
 - [ ] 4.4 Implement adapter bridge points for AWS Secrets Manager, Vault,
   Kubernetes Secrets, Apple Keychain, and cloud key vault providers without

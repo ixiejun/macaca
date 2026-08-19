@@ -14,6 +14,7 @@ members = [
     "crates/services/macaca-foundation-config",
     "crates/services/macaca-foundation-filesystem",
     "crates/services/macaca-foundation-key-value-state",
+    "crates/services/macaca-foundation-secrets-reference",
     "crates/services/macaca-time",
     "crates/services/macaca-llm",
     "crates/services/macaca-memory",
@@ -100,6 +101,7 @@ macaca-random = { path = "crates/services/macaca-random" }
 macaca-foundation-config = { path = "crates/services/macaca-foundation-config" }
 macaca-foundation-filesystem = { path = "crates/services/macaca-foundation-filesystem" }
 macaca-foundation-key-value-state = { path = "crates/services/macaca-foundation-key-value-state" }
+macaca-foundation-secrets-reference = { path = "crates/services/macaca-foundation-secrets-reference" }
 macaca-time = { path = "crates/services/macaca-time" }
 macaca-app = { path = "crates/application/macaca-app" }
 macaca-kernel = { path = "crates/kernel/macaca-kernel" }
