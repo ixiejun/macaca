@@ -30,7 +30,7 @@ pub const DEVICE_CAMERA_COMMANDS: &[&str] = &[
     "camera.inspect_host",
 ];
 
-const CAMERA_PERMISSION_SCOPES: &[&str] = &[
+pub const CAMERA_PERMISSION_SCOPES: &[&str] = &[
     "device.camera.read_status",
     "device.camera.request_permission",
     "device.camera.preview",

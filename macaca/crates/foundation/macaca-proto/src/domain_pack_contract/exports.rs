@@ -189,6 +189,11 @@ pub use super::communication_notification::{
     NotificationUpdateCommand, COMMUNICATION_NOTIFICATION_COMMANDS,
     COMMUNICATION_NOTIFICATION_PACK_ID, COMMUNICATION_NOTIFICATION_SERVICE_ID,
 };
+pub use super::device_camera_preflight::{
+    admit_camera_operation, transition_camera_session, CameraPreflightFacts,
+    CameraPreflightFailure, CameraSessionAction, CameraSessionState,
+};
+pub use super::device_camera_validation::validate_camera_permission_declarations;
 pub use super::expansion::{
     expand_service_capabilities, DomainPackEffectiveCapabilityProjection,
     EffectiveServiceCapabilities,

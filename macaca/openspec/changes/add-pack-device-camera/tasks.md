@@ -24,11 +24,11 @@
 
 ## 4. Service Provider And Capture Session Strategy
 
-- [ ] 4.1 Implement the device camera service provider contract behind the service runtime; do not construct providers from kernel, SDK, shells, or generic application-framework code.
+- [x] 4.1 Implement the device camera service provider contract behind the service runtime; do not construct providers from kernel, SDK, shells, or generic application-framework code.
 - [x] 4.2 Add provider descriptor support for host-native, browser, remote-host, plugin, mock, and unavailable provider classes.
-- [ ] 4.3 Add capture session, preview lease, recording, and frame reference state machines covering requested, active, paused, stopping, closed, expired, revoked, failed, and unavailable states.
+- [x] 4.3 Add capture session, preview lease, recording, and frame reference state machines covering requested, active, paused, stopping, closed, expired, revoked, failed, and unavailable states.
 - [x] 4.4 Add mock and unavailable providers for deterministic tests; host-specific adapters must remain optional providers or plugin/remote modules.
-- [ ] 4.5 Add provider conformance tests for authorization, device listing, session open/close, preview, photo, recording, frame reference, controls, host status, redaction, and unsupported-command reporting.
+- [x] 4.5 Add provider conformance tests for authorization, device listing, session open/close, preview, photo, recording, frame reference, controls, host status, redaction, and unsupported-command reporting.
 - [ ] 4.6 Add lifecycle, health, snapshot, shutdown, timeout, cancellation, interruption handling, resource cleanup, media reference expiry, and bounded output behavior.
 
 ## 5. SDK, Admission, Examples, And ABI
@@ -36,15 +36,15 @@
 - [x] 5.1 Extend SDK discovery for `pack.device.camera.v1` with command schemas, DTO schemas, permission scopes, examples, availability, authorization state, device descriptors, output limits, control support, privacy indicator support, diagnostics, compatibility, and documentation URL.
 - [ ] 5.2 Extend application admission so required declarations block when unavailable/disabled and optional declarations degrade explicitly with effective capability mementos.
 - [x] 5.3 Add SDK command helper builders that only produce canonical traced service calls and never construct providers or branch on host/platform/camera-model names.
-- [ ] 5.4 Add WASM/application ABI exposure for camera commands using provider-neutral DTO schemas and canonical service-call dispatch.
+- [x] 5.4 Add WASM/application ABI exposure for camera commands using provider-neutral DTO schemas and canonical service-call dispatch.
 - [x] 5.5 Add generic examples for authorization, device listing, preview, photo capture, video recording, frame reference, controls, close/revoke, and unavailable-provider diagnostics.
 
 ## 6. Trace, Audit, Replay, And Boundary Gates
 
 - [ ] 6.1 Emit sanitized `camera.pack_declared`, `camera.admission_validated`, `camera.policy_decision`, `camera.authorization_requested`, `camera.session_opened`, `camera.preview_started`, `camera.photo_captured`, `camera.recording_started`, `camera.recording_stopped`, `camera.frame_reference_created`, `camera.controls_changed`, `camera.session_closed`, `camera.session_revoked`, `camera.command_failed`, `camera.unavailable`, and `camera.snapshot_recorded` events.
 - [ ] 6.2 Add replay tests proving every command is trace-addressable through the canonical service path after refresh/restart without raw camera frames or raw media bytes.
-- [ ] 6.3 Add dependency-boundary gates proving microkernel, SDK, shells, and generic application framework do not import concrete camera providers or host camera APIs.
-- [ ] 6.4 Add no-direct-provider-call gates proving all camera commands enter through descriptor-owned service registrations and typed service runtime dispatch.
+- [x] 6.3 Add dependency-boundary gates proving microkernel, SDK, shells, and generic application framework do not import concrete camera providers or host camera APIs.
+- [x] 6.4 Add no-direct-provider-call gates proving all camera commands enter through descriptor-owned service registrations and typed service runtime dispatch.
 - [ ] 6.5 Add redaction tests for raw frames, media bytes, stable hardware identifiers, faces/documents, provider payloads, credentials, session ids, media references, snapshots, and diagnostics.
 - [ ] 6.6 Run `openspec validate add-pack-device-camera --strict`, DTO compatibility tests, authorization tests, session lifecycle tests, media redaction tests, revocation tests, boundary gates, file-size gates, and audit replay checks before marking implementation tasks complete.
 
