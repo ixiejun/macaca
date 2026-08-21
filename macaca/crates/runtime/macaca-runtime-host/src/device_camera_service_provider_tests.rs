@@ -154,3 +154,53 @@ async fn canonical_camera_operations_emit_sanitized_audit_taxonomy() {
         assert!(!event.replay_ref.contains("must-not-appear"));
     }
 }
+
+#[tokio::test]
+async fn camera_results_events_and_snapshots_redact_sensitive_provider_data() {
+    let provider = DeviceCameraSystemServiceProvider::mock();
+    let mut events = provider.subscribe();
+    let sensitive = serde_json::json!({
+        "raw_frame": "raw-frame-marker",
+        "media_bytes": "media-bytes-marker",
+        "hardware_id": "hardware-marker",
+        "detected_face": "face-marker",
+        "document": "document-marker",
+        "provider_payload": "provider-marker",
+        "credential": "credential-marker",
+        "session_id": "session-marker",
+        "media_reference": "media-reference-marker",
+        "snapshot": "snapshot-marker",
+        "diagnostics": "diagnostics-marker"
+    });
+    let result = provider
+        .call(ServiceCommand::with_trace(
+            ServiceCommandName::new("camera.capture_photo"),
+            sensitive,
+            TraceContext::new("camera-redaction"),
+        ))
+        .await
+        .unwrap();
+    let event = events.recv().await.unwrap();
+    let snapshot = provider.snapshot().await;
+    let snapshot_event = events.recv().await.unwrap();
+
+    let observable = format!("{result:?}{event:?}{snapshot:?}{snapshot_event:?}");
+    for marker in [
+        "raw-frame-marker",
+        "media-bytes-marker",
+        "hardware-marker",
+        "face-marker",
+        "document-marker",
+        "provider-marker",
+        "credential-marker",
+        "session-marker",
+        "media-reference-marker",
+        "snapshot-marker",
+        "diagnostics-marker",
+    ] {
+        assert!(
+            !observable.contains(marker),
+            "sensitive marker leaked: {marker}"
+        );
+    }
+}
