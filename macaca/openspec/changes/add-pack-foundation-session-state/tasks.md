@@ -84,7 +84,7 @@
 - [ ] 5.4 Extend effective capability projection so applications can inspect
   callable commands, denied commands, unavailable session features, provider
   capability flags, latest checkpoint, and replay references.
-- [ ] 5.5 Expose WASM host imports only for declared callable session-state
+- [x] 5.5 Expose WASM host imports only for declared callable session-state
   commands and route every import through the service runtime path.
 - [x] 5.6 Add app-framework tests proving YAML, WASM, GenUI, and headless apps all
   use the same session-state execution path.
