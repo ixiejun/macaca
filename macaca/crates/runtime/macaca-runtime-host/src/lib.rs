@@ -87,6 +87,7 @@ pub mod foundation_filesystem_service_provider;
 pub mod foundation_key_value_state_service_provider;
 pub mod foundation_secrets_reference_service_provider;
 pub mod foundation_session_state_embedded_provider;
+pub mod foundation_session_state_remote_bridge;
 pub mod foundation_session_state_service_provider;
 mod framework_public_api;
 pub mod framework_runtime_agent_service;

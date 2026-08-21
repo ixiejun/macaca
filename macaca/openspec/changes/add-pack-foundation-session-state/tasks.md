@@ -66,7 +66,7 @@
 - [x] 4.3 Implement deterministic mock provider for contract and replay tests.
 - [x] 4.4 Implement or bind embedded durable provider with revision tracking,
   checkpoint references, retention enforcement, compaction, and restore dry-run.
-- [ ] 4.5 Add optional remote session store/replay provider bridge points without
+- [x] 4.5 Add optional remote session store/replay provider bridge points without
   leaking provider-native APIs to SDK callers.
 - [x] 4.6 Add lifecycle, health, snapshot, shutdown, retention cleanup, compaction,
   restore, redaction, and provider capability reports.
