@@ -11,10 +11,11 @@ use std::sync::Arc;
 use macaca_proto::{
     expand_service_capabilities, validate_filesystem_root_declarations,
     validate_key_value_namespace_declarations, validate_secret_reference_declarations,
-    validate_session_state_declarations, ApplicationAbiDeclaration, ApplicationAbiError,
-    ApplicationCheckpoint, ApplicationExport, ApplicationHostCommandResult,
-    ApplicationHostCommandStatus, ApplicationLifecycleState, DomainPackCatalog,
-    EffectiveServiceCapabilities, InMemoryDomainPackCatalog, PackageDescriptor, PackageRuntimeKind,
+    validate_session_state_declarations, validate_transcription_permission_declarations,
+    ApplicationAbiDeclaration, ApplicationAbiError, ApplicationCheckpoint, ApplicationExport,
+    ApplicationHostCommandResult, ApplicationHostCommandStatus, ApplicationLifecycleState,
+    DomainPackCatalog, EffectiveServiceCapabilities, InMemoryDomainPackCatalog, PackageDescriptor,
+    PackageRuntimeKind,
 };
 use tracing::{info, warn};
 
@@ -159,6 +160,10 @@ impl ApplicationAbiAdapter for YamlApplicationAbiAdapter {
             })?;
             validate_session_state_declarations(service_contract).map_err(|reason| {
                 warn!(application_id = %application_id, reason, "application ABI session-state admission rejected");
+                ApplicationAbiError::InvalidDeclaration(reason.into())
+            })?;
+            validate_transcription_permission_declarations(service_contract).map_err(|reason| {
+                warn!(application_id = %application_id, reason, "application ABI transcription permission admission rejected");
                 ApplicationAbiError::InvalidDeclaration(reason.into())
             })?;
         }
@@ -384,6 +389,10 @@ mod foundation_secrets_reference_tests;
 #[cfg(test)]
 #[path = "abi_foundation_session_state_tests.rs"]
 mod foundation_session_state_tests;
+
+#[cfg(test)]
+#[path = "abi_media_transcription_tests.rs"]
+mod media_transcription_tests;
 
 #[cfg(test)]
 #[path = "abi_time_tests.rs"]

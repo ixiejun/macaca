@@ -144,6 +144,7 @@ pub mod media_common;
 pub mod media_image;
 pub mod media_rendering;
 pub mod media_transcription;
+mod media_transcription_validation;
 pub mod media_video;
 mod model;
 mod model_diagnostics;

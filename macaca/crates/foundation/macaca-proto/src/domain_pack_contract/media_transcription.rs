@@ -37,7 +37,7 @@ pub const MEDIA_TRANSCRIPTION_COMMANDS: &[&str] = &[
     "transcription.get_artifact_handle",
 ];
 
-const TRANSCRIPTION_PERMISSION_SCOPES: &[&str] = &[
+pub(crate) const TRANSCRIPTION_PERMISSION_SCOPES: &[&str] = &[
     "transcription.provider.inspect",
     "transcription.source.import",
     "transcription.source.open",
