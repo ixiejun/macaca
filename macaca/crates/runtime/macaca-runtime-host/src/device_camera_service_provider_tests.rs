@@ -50,9 +50,31 @@ async fn unavailable_camera_fails_closed_and_snapshot_is_bounded() {
         ));
         assert_eq!(events.recv().await.unwrap().outcome, "unavailable");
     }
-    let snapshot = provider.snapshot();
+    let snapshot = provider.snapshot().await;
     assert_eq!(snapshot["snapshot_schema"], "device.camera.replay.v1");
     assert_eq!(events.recv().await.unwrap().outcome, "snapshot_recorded");
+}
+
+#[tokio::test]
+async fn cleanup_releases_synthetic_camera_session_and_output_resources() {
+    let provider = DeviceCameraSystemServiceProvider::mock();
+    for command in ["camera.open_session", "camera.start_preview"] {
+        provider
+            .call(ServiceCommand::with_trace(
+                ServiceCommandName::new(command),
+                serde_json::json!({}),
+                TraceContext::new(command),
+            ))
+            .await
+            .unwrap();
+    }
+    let active = provider.snapshot().await;
+    assert_eq!(active["active_session_count"], "1");
+    assert_eq!(active["active_output_count"], "1");
+    provider.cleanup().await.unwrap();
+    let released = provider.snapshot().await;
+    assert_eq!(released["active_session_count"], "0");
+    assert_eq!(released["active_output_count"], "0");
 }
 
 #[tokio::test]

@@ -3,7 +3,7 @@
 //! The mock produces synthetic references only. It never opens a host camera,
 //! reads raw frames, retains media bytes, or exposes hardware identifiers.
 
-use std::collections::BTreeMap;
+use std::{collections::BTreeMap, sync::Arc};
 
 use async_trait::async_trait;
 use macaca_kernel::SystemService;
@@ -17,6 +17,8 @@ use macaca_proto::{
     ServiceHealth, ServiceResult, ServiceType, TraceSchemaRef,
 };
 use tracing::{info, warn};
+
+use crate::device_camera_service_state::CameraLifecycleLedger;
 
 /// Bounded audit/replay event with no frame, media, or device payload fields.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -32,6 +34,7 @@ pub struct DeviceCameraSystemServiceProvider {
     unavailable_reason: Option<String>,
     admission_facts: CameraPreflightFacts,
     events: tokio::sync::broadcast::Sender<CameraRuntimeEvent>,
+    lifecycle: Arc<CameraLifecycleLedger>,
 }
 
 impl DeviceCameraSystemServiceProvider {
@@ -51,6 +54,7 @@ impl DeviceCameraSystemServiceProvider {
             unavailable_reason,
             admission_facts: CameraPreflightFacts::permissive(),
             events,
+            lifecycle: Arc::new(CameraLifecycleLedger::default()),
         }
     }
 
@@ -66,12 +70,13 @@ impl DeviceCameraSystemServiceProvider {
     }
 
     /// Produce a bounded Memento for host recovery diagnostics.
-    pub fn snapshot(&self) -> BTreeMap<String, String> {
+    pub async fn snapshot(&self) -> BTreeMap<String, String> {
         let state = if self.unavailable_reason.is_some() {
             "unavailable"
         } else {
             "preview"
         };
+        let resources = self.lifecycle.snapshot().await;
         let snapshot = BTreeMap::from([
             (
                 "provider_class".into(),
@@ -85,6 +90,14 @@ impl DeviceCameraSystemServiceProvider {
             (
                 "command_count".into(),
                 DEVICE_CAMERA_COMMANDS.len().to_string(),
+            ),
+            (
+                "active_session_count".into(),
+                resources.active_session_count.to_string(),
+            ),
+            (
+                "active_output_count".into(),
+                resources.active_output_count.to_string(),
             ),
             ("snapshot_schema".into(), "device.camera.replay.v1".into()),
         ]);
@@ -158,6 +171,9 @@ impl SystemService for DeviceCameraSystemServiceProvider {
             warn!(service_id = DEVICE_CAMERA_SERVICE_ID, command = operation, trace_id = %trace.trace_id, rejection = ?rejection, "device camera command rejected before adapter dispatch");
             return Err(preflight_error(rejection));
         }
+        self.lifecycle
+            .record_completion(operation, &trace.trace_id)
+            .await;
         self.emit(operation, &trace.trace_id, "completed");
         info!(service_id = DEVICE_CAMERA_SERVICE_ID, command = operation, trace_id = %trace.trace_id, "device camera command completed with synthetic references");
         Ok(domain_pack_service_result(
@@ -168,9 +184,19 @@ impl SystemService for DeviceCameraSystemServiceProvider {
     }
 
     async fn stop(&self) -> ServiceResult<()> {
+        self.lifecycle.clear().await;
+        info!(
+            service_id = DEVICE_CAMERA_SERVICE_ID,
+            "device camera provider stopped and released resources"
+        );
         Ok(())
     }
     async fn cleanup(&self) -> ServiceResult<()> {
+        self.lifecycle.clear().await;
+        info!(
+            service_id = DEVICE_CAMERA_SERVICE_ID,
+            "device camera provider cleanup released resources"
+        );
         Ok(())
     }
     async fn health(&self) -> ServiceResult<ServiceHealth> {
