@@ -32,7 +32,7 @@ pub const MEDIA_AUDIO_COMMANDS: &[&str] = &[
     "audio.get_artifact_handle",
 ];
 
-const AUDIO_PERMISSION_SCOPES: &[&str] = &[
+pub const AUDIO_PERMISSION_SCOPES: &[&str] = &[
     "audio.provider.inspect",
     "audio.import",
     "audio.open",

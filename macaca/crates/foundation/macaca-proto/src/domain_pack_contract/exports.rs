@@ -434,6 +434,10 @@ pub use super::knowledge_summarization::{
 pub use super::knowledge_summarization_preflight::{
     SummarizationAdmissionEvidence, SummarizationDispatchPreflight,
 };
+pub use super::media_audio_preflight::{
+    admit_audio_operation, AudioPreflightFacts, AudioPreflightFailure,
+};
+pub use super::media_audio_validation::validate_audio_permission_declarations;
 pub use super::media_common::{MediaCommandEnvelope, MediaError, MediaPage};
 pub use super::media_transcription_preflight::{
     admit_transcription_operation, TranscriptionPreflightFacts, TranscriptionPreflightFailure,

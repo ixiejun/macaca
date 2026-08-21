@@ -140,6 +140,8 @@ pub mod location_place_search;
 pub mod location_route;
 pub mod location_timezone;
 pub mod media_audio;
+pub mod media_audio_preflight;
+mod media_audio_validation;
 pub mod media_common;
 pub mod media_image;
 pub mod media_rendering;
