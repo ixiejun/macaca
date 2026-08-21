@@ -378,5 +378,9 @@ mod foundation_key_value_state_tests;
 mod foundation_secrets_reference_tests;
 
 #[cfg(test)]
+#[path = "abi_foundation_session_state_tests.rs"]
+mod foundation_session_state_tests;
+
+#[cfg(test)]
 #[path = "abi_time_tests.rs"]
 mod time_tests;

@@ -86,7 +86,7 @@
   capability flags, latest checkpoint, and replay references.
 - [ ] 5.5 Expose WASM host imports only for declared callable session-state
   commands and route every import through the service runtime path.
-- [ ] 5.6 Add app-framework tests proving YAML, WASM, GenUI, and headless apps all
+- [x] 5.6 Add app-framework tests proving YAML, WASM, GenUI, and headless apps all
   use the same session-state execution path.
 
 ## 6. Trace, Audit, Replay, And Gates
