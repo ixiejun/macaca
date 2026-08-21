@@ -32,9 +32,9 @@
 
 ## 4. Service Provider And Runtime Integration
 
-- [ ] 4.1 Implement or bind the transcription service provider behind the service runtime; do not construct transcription providers from SDK, shell, kernel, or application code.
+- [x] 4.1 Implement or bind the transcription service provider behind the service runtime; do not construct transcription providers from SDK, shell, kernel, or application code.
 - [x] 4.2 Add a deterministic unavailable provider that returns typed unavailable/unsupported diagnostics and complete discovery metadata.
-- [ ] 4.3 Add mock provider support for provider inspection, source import/open, media inspection, batch planning/request, stream planning/start/append/finish/cancel, diarization planning/request, timestamp alignment, transcript normalization, redaction planning/request, subtitle export planning/request, translation handoff planning/request, job inspection, artifact handles, health, and provider capability inspection.
+- [x] 4.3 Add mock provider support for provider inspection, source import/open, media inspection, batch planning/request, stream planning/start/append/finish/cancel, diarization planning/request, timestamp alignment, transcript normalization, redaction planning/request, subtitle export planning/request, translation handoff planning/request, job inspection, artifact handles, health, and provider capability inspection.
 - [ ] 4.4 Add lifecycle, health, snapshot, shutdown, timeout, cancellation, bounded paging, streaming partial-result behavior, asynchronous job/artifact behavior, source version freshness, stale-version diagnostics, schema/format/language/model mismatch diagnostics, diarization/timestamp/redaction/subtitle/translation diagnostics, artifact retention, and rate-limit diagnostics.
 - [ ] 4.5 Add Strategy implementations for provider adapters, batch processors, streaming processors, stream chunk validators, diarizers, timestamp aligners, transcript normalizers, redactors, subtitle exporters, translation handoff adapters, artifact providers, redaction, and unavailable behavior.
 - [ ] 4.6 Add explicit state machines for streaming sessions and asynchronous jobs, including planned, started, accepting_chunks, draining, finished, cancelled, failed, timed_out, unavailable, and replay states.

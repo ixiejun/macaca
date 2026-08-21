@@ -117,6 +117,7 @@ pub(crate) mod mcp_invocation_registry;
 pub(crate) mod mcp_operator_lifecycle;
 pub mod mcp_runtime;
 pub mod mcp_service_provider;
+pub mod media_transcription_service_provider;
 pub mod memory_service_provider;
 pub mod messaging_service_provider;
 pub mod notification_service_provider;
@@ -138,6 +139,8 @@ mod foundation_secrets_reference_audit_tests;
 mod foundation_session_state_embedded_provider_tests;
 #[cfg(test)]
 mod foundation_session_state_service_provider_tests;
+#[cfg(test)]
+mod media_transcription_service_provider_tests;
 pub mod plugin;
 pub mod plugin_capability;
 pub mod plugin_capability_service_provider;
