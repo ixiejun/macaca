@@ -58,7 +58,7 @@
 - [x] 6.4 Add dependency gates proving kernel, SDK, shells, and generic application framework do not import concrete Amazon, Google, Azure, OpenAI, Deepgram, AssemblyAI, Rev, Speechmatics, local model, storage, moderation, credential-manager, artifact-provider, translation, or export adapters.
 - [x] 6.5 Add no-direct-provider-call gates proving SDK helpers, WASM ABI handlers, app admission, web, CLI, and frontend paths route through descriptor-owned service commands.
 - [x] 6.6 Add boundary tests proving optional provider absence returns structured unavailable diagnostics and never crashes, hangs, silently falls back, reads private audio/video, streams chunks, generates transcripts, diarizes, redacts, exports subtitles, translates, publishes artifacts, contacts providers, or fakes success.
-- [ ] 6.7 Run `openspec validate add-pack-media-transcription --strict`, targeted cargo tests, boundary gates, file-size gates, and audit replay checks before marking implementation complete.
+- [x] 6.7 Run `openspec validate add-pack-media-transcription --strict`, targeted cargo tests, boundary gates, file-size gates, and audit replay checks before marking implementation complete.
 
 ## 7. Developer Documentation
 
