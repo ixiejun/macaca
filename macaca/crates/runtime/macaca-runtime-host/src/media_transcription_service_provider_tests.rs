@@ -33,21 +33,29 @@ async fn declared_transcription_commands_are_traceable_and_redacted() {
 }
 
 #[tokio::test]
-async fn unavailable_provider_fails_closed_without_audio_processing() {
+async fn unavailable_provider_fails_closed_for_every_declared_command() {
     let provider = MediaTranscriptionSystemServiceProvider::unavailable("module_absent");
+    let mut events = provider.subscribe();
     assert!(matches!(
         provider.health().await.unwrap(),
         ServiceHealth::Unavailable { .. }
     ));
-    let error = provider
-        .call(ServiceCommand::with_trace(
-            ServiceCommandName::new("transcription.batch_request"),
-            serde_json::json!({"raw_audio": "must-not-process"}),
-            TraceContext::new("transcription-unavailable"),
-        ))
-        .await
-        .unwrap_err();
-    assert!(matches!(error, ServiceError::ServiceUnavailable(_)));
+    for command in MEDIA_TRANSCRIPTION_COMMANDS {
+        let raw_marker = "must-not-process-or-observe";
+        let error = provider
+            .call(ServiceCommand::with_trace(
+                ServiceCommandName::new(*command),
+                serde_json::json!({"raw_audio":raw_marker,"raw_transcript":raw_marker}),
+                TraceContext::new(format!("unavailable-{command}")),
+            ))
+            .await
+            .unwrap_err();
+        assert!(matches!(error, ServiceError::ServiceUnavailable(_)));
+        let event = events.recv().await.unwrap();
+        assert_eq!(event.outcome, "unavailable");
+        assert!(!event.command.contains(raw_marker));
+        assert!(!event.replay_ref.contains(raw_marker));
+    }
     assert_eq!(provider.capability().provider_class, "unavailable");
 }
 
