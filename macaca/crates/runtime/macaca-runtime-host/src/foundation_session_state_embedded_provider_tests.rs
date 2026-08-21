@@ -276,3 +276,70 @@ async fn approved_clear_is_allowed_after_policy_evidence() {
         .revision_hashes
         .is_empty());
 }
+
+#[tokio::test]
+async fn invalid_unsupported_and_quota_failures_do_not_mutate_state() {
+    let provider =
+        EmbeddedFoundationSessionStateProvider::new(Arc::new(MemoryPersistStore::default()));
+    provider
+        .call(put_command("failure-seed", "artifact:seed"))
+        .await
+        .unwrap();
+    let before = provider.snapshot().await.unwrap();
+
+    let invalid_value = provider
+        .call(put_command("invalid-value", "not-an-opaque-reference\n"))
+        .await
+        .unwrap_err();
+    assert!(invalid_value.to_string().contains("opaque artifact"));
+
+    let schema_mismatch = provider
+        .call(ServiceCommand::with_trace(
+            ServiceCommandName::new("session_state.put"),
+            serde_json::json!({
+                "key": {"session": session(), "key": "form.field"},
+                "value": {"value_ref": "artifact:other-schema", "schema_id": "form.v2", "secret_reference_required": false},
+                "expected_revision": null
+            }),
+            TraceContext::new("schema-mismatch"),
+        ))
+        .await
+        .unwrap_err();
+    assert!(schema_mismatch.to_string().contains("schema mismatch"));
+
+    let invalid_checkpoint = provider
+        .call(ServiceCommand::with_trace(
+            ServiceCommandName::new("session_state.restore_checkpoint"),
+            serde_json::json!({
+                "plan": {"checkpoint": {"checkpoint_id": "missing", "session": session(), "revision_id": "revision"}, "dry_run": true, "cross_session_allowed": false}
+            }),
+            TraceContext::new("invalid-checkpoint"),
+        ))
+        .await
+        .unwrap();
+    assert_eq!(invalid_checkpoint.output["status"], "not_found");
+
+    let unsupported = provider
+        .call(ServiceCommand::with_trace(
+            ServiceCommandName::new("session_state.unsupported"),
+            serde_json::json!({}),
+            TraceContext::new("unsupported-command"),
+        ))
+        .await
+        .unwrap_err();
+    assert!(unsupported.to_string().contains("unsupported command"));
+
+    let quota = provider
+        .call(ServiceCommand::with_trace(
+            ServiceCommandName::new("session_state.create_checkpoint"),
+            serde_json::json!({
+                "session": session(),
+                "retention": {"ttl_seconds": null, "max_checkpoints": 0, "compact_after_revisions": 20}
+            }),
+            TraceContext::new("quota-checkpoint"),
+        ))
+        .await
+        .unwrap_err();
+    assert!(quota.to_string().contains("retention policy"));
+    assert_eq!(provider.snapshot().await.unwrap(), before);
+}

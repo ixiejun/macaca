@@ -119,4 +119,6 @@ async fn session_state_provider_reports_snapshot_and_unavailable_state() {
             .await,
         Err(ServiceError::ServiceUnavailable(_))
     ));
+    let unavailable_snapshot = unavailable.snapshot().await;
+    assert!(unavailable_snapshot.revision_hashes.is_empty());
 }

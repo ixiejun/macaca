@@ -244,6 +244,20 @@ impl EmbeddedFoundationSessionStateProvider {
         }
         let mut record = self.load(&request.key.session).await?;
         check_revision(&record, request.expected_revision.as_ref())?;
+        // A key has one provider-neutral schema lineage. Reject a conflicting
+        // declared schema before replacing its opaque reference, so recovery
+        // cannot silently reinterpret retained session state after restart.
+        if record
+            .entries
+            .get(&request.key.key)
+            .is_some_and(|existing| {
+                existing.schema_id.is_some()
+                    && request.value.schema_id.is_some()
+                    && existing.schema_id != request.value.schema_id
+            })
+        {
+            return Err(ServiceError::AdapterFailure("schema mismatch".into()));
+        }
         record.entries.insert(request.key.key, request.value);
         record.revision = record.revision.saturating_add(1);
         let revision = revision(&record);

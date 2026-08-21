@@ -53,7 +53,7 @@
   export, and cross-session restore.
 - [x] 3.5 Reject raw secrets and require secret-reference interoperability for
   secret-classified state.
-- [ ] 3.6 Add tests proving denied, unavailable, quota, schema_mismatch, invalid
+- [x] 3.6 Add tests proving denied, unavailable, quota, schema_mismatch, invalid
   checkpoint, and unsupported paths do not mutate provider state.
 
 ## 4. Service Provider And Runtime Integration
