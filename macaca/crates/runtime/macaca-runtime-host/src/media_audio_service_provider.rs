@@ -38,6 +38,7 @@ pub struct MediaAudioSystemServiceProvider {
     unavailable_reason: Option<String>,
     events: tokio::sync::broadcast::Sender<AudioRuntimeEvent>,
     side_effects: Arc<AudioSideEffectLedger>,
+    admission_facts: AudioPreflightFacts,
 }
 
 impl MediaAudioSystemServiceProvider {
@@ -57,7 +58,18 @@ impl MediaAudioSystemServiceProvider {
             unavailable_reason,
             events,
             side_effects: Arc::new(AudioSideEffectLedger::default()),
+            admission_facts: AudioPreflightFacts::permissive(),
         }
+    }
+
+    /// Replace preview evidence with host-issued admission facts.
+    ///
+    /// This is a composition-root seam for policy, entitlement, resource,
+    /// approval, and capability decorators. It intentionally cannot inspect or
+    /// derive authorization from caller-provided command metadata or payloads.
+    pub fn with_admission_facts(mut self, admission_facts: AudioPreflightFacts) -> Self {
+        self.admission_facts = admission_facts;
+        self
     }
 
     /// Report descriptor-owned capability facts, never engine or voice internals.
@@ -163,8 +175,9 @@ impl SystemService for MediaAudioSystemServiceProvider {
             warn!(service_id = MEDIA_AUDIO_SERVICE_ID, command = operation, trace_id = %trace.trace_id, reason_code = %reason, "media audio provider unavailable");
             return Err(ServiceError::ServiceUnavailable(reason.clone()));
         }
-        if let Err(rejection) = admit_audio_operation(operation, preflight_facts(&command)) {
+        if let Err(rejection) = admit_audio_operation(operation, self.admission_facts) {
             self.emit(operation, &trace.trace_id, "preflight_rejected");
+            warn!(service_id = MEDIA_AUDIO_SERVICE_ID, command = operation, trace_id = %trace.trace_id, rejection = ?rejection, "media audio command rejected before provider dispatch");
             return Err(preflight_error(rejection));
         }
         if let Err(error) = AudioSideEffectLedger::validate_audio_version(&command) {
@@ -203,36 +216,19 @@ impl SystemService for MediaAudioSystemServiceProvider {
     }
 }
 
-/// Read bounded host-issued evidence only; raw command payloads are never inspected.
-fn preflight_facts(command: &ServiceCommand) -> AudioPreflightFacts {
-    let enabled = |key: &str, default: bool| {
-        command
-            .metadata
-            .get(key)
-            .map_or(default, |value| value == "true")
-    };
-    AudioPreflightFacts {
-        permission_granted: enabled("permission_granted", true),
-        provider_available: enabled("provider_available", true),
-        scope_granted: enabled("scope_granted", true),
-        approval_granted: enabled("approval_granted", true),
-        approval_required: enabled("approval_required", false),
-        requested_units: command
-            .metadata
-            .get("requested_units")
-            .and_then(|value| value.parse().ok())
-            .unwrap_or(1),
-        reserved_units: command
-            .metadata
-            .get("reserved_units")
-            .and_then(|value| value.parse().ok())
-            .unwrap_or(1),
-    }
-}
-
 fn preflight_error(rejection: AudioPreflightFailure) -> ServiceError {
     match rejection {
-        AudioPreflightFailure::Denied | AudioPreflightFailure::ApprovalRequired => {
+        AudioPreflightFailure::Denied
+        | AudioPreflightFailure::ApprovalRequired
+        | AudioPreflightFailure::PolicyDenied
+        | AudioPreflightFailure::EntitlementDenied
+        | AudioPreflightFailure::MetadataDenied
+        | AudioPreflightFailure::VoiceDenied
+        | AudioPreflightFailure::PromptDenied
+        | AudioPreflightFailure::SynthesisDenied
+        | AudioPreflightFailure::ExportDenied
+        | AudioPreflightFailure::WriteDenied
+        | AudioPreflightFailure::ArtifactDenied => {
             ServiceError::DisabledByPolicy(format!("audio_{rejection:?}").to_lowercase())
         }
         AudioPreflightFailure::Unavailable => {
@@ -240,6 +236,14 @@ fn preflight_error(rejection: AudioPreflightFailure) -> ServiceError {
         }
         AudioPreflightFailure::QuotaExceeded => {
             ServiceError::AdapterFailure("audio_quota_exceeded".into())
+        }
+        AudioPreflightFailure::SchemaMismatch
+        | AudioPreflightFailure::FormatUnsupported
+        | AudioPreflightFailure::CodecUnsupported => {
+            ServiceError::UnsupportedCommand(format!("audio_{rejection:?}").to_lowercase())
+        }
+        AudioPreflightFailure::Timeout | AudioPreflightFailure::Cancellation => {
+            ServiceError::AdapterFailure(format!("audio_{rejection:?}").to_lowercase())
         }
     }
 }

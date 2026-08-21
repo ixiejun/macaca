@@ -2,7 +2,10 @@
 
 use macaca_kernel::SystemService;
 use macaca_proto::media_audio::MEDIA_AUDIO_COMMANDS;
-use macaca_proto::{ServiceCommand, ServiceCommandName, ServiceError, ServiceHealth, TraceContext};
+use macaca_proto::{
+    AudioPreflightFacts, ServiceCommand, ServiceCommandName, ServiceError, ServiceHealth,
+    TraceContext,
+};
 
 use super::media_audio_service_provider::MediaAudioSystemServiceProvider;
 
@@ -51,16 +54,17 @@ async fn unavailable_audio_provider_fails_closed_for_every_command() {
 
 #[tokio::test]
 async fn preflight_and_replay_are_bounded() {
-    let provider = MediaAudioSystemServiceProvider::mock();
+    let provider =
+        MediaAudioSystemServiceProvider::mock().with_admission_facts(AudioPreflightFacts {
+            permission_granted: false,
+            ..AudioPreflightFacts::permissive()
+        });
     let mut events = provider.subscribe();
-    let mut denied = ServiceCommand::with_trace(
+    let denied = ServiceCommand::with_trace(
         ServiceCommandName::new("audio.export_request"),
         serde_json::json!({}),
         TraceContext::new("audio-denied"),
     );
-    denied
-        .metadata
-        .insert("permission_granted".into(), "false".into());
     assert!(matches!(
         provider.call(denied).await,
         Err(ServiceError::DisabledByPolicy(_))
@@ -73,6 +77,99 @@ async fn preflight_and_replay_are_bounded() {
         MEDIA_AUDIO_COMMANDS.len().to_string()
     );
     assert_eq!(events.recv().await.unwrap().outcome, "snapshot_recorded");
+}
+
+#[tokio::test]
+async fn host_issued_rejections_never_complete_or_observe_command_payloads() {
+    let rejected_facts = [
+        AudioPreflightFacts {
+            scope_granted: false,
+            ..AudioPreflightFacts::permissive()
+        },
+        AudioPreflightFacts {
+            policy_granted: false,
+            ..AudioPreflightFacts::permissive()
+        },
+        AudioPreflightFacts {
+            entitlement_granted: false,
+            ..AudioPreflightFacts::permissive()
+        },
+        AudioPreflightFacts {
+            schema_valid: false,
+            ..AudioPreflightFacts::permissive()
+        },
+        AudioPreflightFacts {
+            format_supported: false,
+            ..AudioPreflightFacts::permissive()
+        },
+        AudioPreflightFacts {
+            codec_supported: false,
+            ..AudioPreflightFacts::permissive()
+        },
+        AudioPreflightFacts {
+            metadata_allowed: false,
+            ..AudioPreflightFacts::permissive()
+        },
+        AudioPreflightFacts {
+            voice_allowed: false,
+            ..AudioPreflightFacts::permissive()
+        },
+        AudioPreflightFacts {
+            prompt_allowed: false,
+            ..AudioPreflightFacts::permissive()
+        },
+        AudioPreflightFacts {
+            synthesis_allowed: false,
+            ..AudioPreflightFacts::permissive()
+        },
+        AudioPreflightFacts {
+            export_allowed: false,
+            ..AudioPreflightFacts::permissive()
+        },
+        AudioPreflightFacts {
+            write_allowed: false,
+            ..AudioPreflightFacts::permissive()
+        },
+        AudioPreflightFacts {
+            artifact_allowed: false,
+            ..AudioPreflightFacts::permissive()
+        },
+        AudioPreflightFacts {
+            requested_units: 2,
+            reserved_units: 1,
+            ..AudioPreflightFacts::permissive()
+        },
+        AudioPreflightFacts {
+            approval_required: true,
+            approval_granted: false,
+            ..AudioPreflightFacts::permissive()
+        },
+        AudioPreflightFacts {
+            within_timeout: false,
+            ..AudioPreflightFacts::permissive()
+        },
+        AudioPreflightFacts {
+            cancellation_requested: true,
+            ..AudioPreflightFacts::permissive()
+        },
+    ];
+    for (index, facts) in rejected_facts.into_iter().enumerate() {
+        let provider = MediaAudioSystemServiceProvider::mock().with_admission_facts(facts);
+        let mut events = provider.subscribe();
+        let marker = "must-not-enter-audio-provider";
+        assert!(provider
+            .call(ServiceCommand::with_trace(
+                ServiceCommandName::new("audio.export_request"),
+                serde_json::json!({"raw_audio":marker,"raw_prompt":marker}),
+                TraceContext::new(format!("audio-rejected-{index}")),
+            ))
+            .await
+            .is_err());
+        let event = events.recv().await.unwrap();
+        assert_eq!(event.outcome, "preflight_rejected");
+        assert!(!event.command.contains(marker));
+        assert!(!event.replay_ref.contains(marker));
+    }
 }
 
 #[tokio::test]
