@@ -4,7 +4,10 @@
 //! prompts, voice data, audio files, or provider payloads. Production adapters
 //! are selected only by the runtime-host composition root.
 
-use std::collections::{BTreeMap, BTreeSet};
+use std::{
+    collections::{BTreeMap, BTreeSet},
+    sync::Arc,
+};
 
 use async_trait::async_trait;
 use macaca_kernel::SystemService;
@@ -19,6 +22,8 @@ use macaca_proto::{
 };
 use tracing::{info, warn};
 
+use crate::media_audio_service_state::AudioSideEffectLedger;
+
 /// Bounded audit/replay event that deliberately excludes all media payloads.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct AudioRuntimeEvent {
@@ -32,6 +37,7 @@ pub struct AudioRuntimeEvent {
 pub struct MediaAudioSystemServiceProvider {
     unavailable_reason: Option<String>,
     events: tokio::sync::broadcast::Sender<AudioRuntimeEvent>,
+    side_effects: Arc<AudioSideEffectLedger>,
 }
 
 impl MediaAudioSystemServiceProvider {
@@ -50,6 +56,7 @@ impl MediaAudioSystemServiceProvider {
         Self {
             unavailable_reason,
             events,
+            side_effects: Arc::new(AudioSideEffectLedger::default()),
         }
     }
 
@@ -84,7 +91,7 @@ impl MediaAudioSystemServiceProvider {
     }
 
     /// Produce a bounded Memento for restart diagnostics.
-    pub fn snapshot(&self) -> BTreeMap<String, String> {
+    pub async fn snapshot(&self) -> BTreeMap<String, String> {
         let snapshot = BTreeMap::from([
             ("provider_class".into(), self.capability().provider_class),
             (
@@ -94,6 +101,10 @@ impl MediaAudioSystemServiceProvider {
             (
                 "command_count".into(),
                 MEDIA_AUDIO_COMMANDS.len().to_string(),
+            ),
+            (
+                "idempotency_completion_count".into(),
+                self.side_effects.completion_count().await.to_string(),
             ),
             ("snapshot_schema".into(), "media.audio.replay.v1".into()),
         ]);
@@ -156,10 +167,18 @@ impl SystemService for MediaAudioSystemServiceProvider {
             self.emit(operation, &trace.trace_id, "preflight_rejected");
             return Err(preflight_error(rejection));
         }
+        if let Err(error) = AudioSideEffectLedger::validate_audio_version(&command) {
+            self.emit(operation, &trace.trace_id, "precondition_rejected");
+            return Err(error);
+        }
+        let artifact_ref = self
+            .side_effects
+            .outcome_ref(&command, format!("artifact:audio:{}", trace.trace_id))
+            .await;
         self.emit(operation, &trace.trace_id, "completed");
         info!(service_id = MEDIA_AUDIO_SERVICE_ID, command = operation, trace_id = %trace.trace_id, "media audio command completed");
         Ok(domain_pack_service_result(
-            serde_json::json!({"status":"metadata_only","operation":operation,"artifact_ref":format!("artifact:audio:{}", trace.trace_id)}),
+            serde_json::json!({"status":"metadata_only","operation":operation,"artifact_ref":artifact_ref}),
             trace,
             "mock",
         ))
@@ -169,6 +188,7 @@ impl SystemService for MediaAudioSystemServiceProvider {
         Ok(())
     }
     async fn cleanup(&self) -> ServiceResult<()> {
+        self.side_effects.clear().await;
         Ok(())
     }
     async fn health(&self) -> ServiceResult<ServiceHealth> {
