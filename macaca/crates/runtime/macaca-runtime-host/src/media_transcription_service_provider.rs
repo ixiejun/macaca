@@ -40,6 +40,7 @@ pub struct MediaTranscriptionSystemServiceProvider {
     unavailable_reason: Option<String>,
     events: tokio::sync::broadcast::Sender<TranscriptionRuntimeEvent>,
     side_effects: Arc<TranscriptionSideEffectLedger>,
+    admission_facts: TranscriptionPreflightFacts,
 }
 
 impl MediaTranscriptionSystemServiceProvider {
@@ -59,7 +60,15 @@ impl MediaTranscriptionSystemServiceProvider {
             unavailable_reason,
             events,
             side_effects: Arc::new(TranscriptionSideEffectLedger::default()),
+            admission_facts: TranscriptionPreflightFacts::permissive(),
         }
+    }
+
+    /// Inject host-issued admission evidence at the composition root.
+    /// Callers cannot influence this decision through command metadata or payloads.
+    pub fn with_admission_facts(mut self, admission_facts: TranscriptionPreflightFacts) -> Self {
+        self.admission_facts = admission_facts;
+        self
     }
 
     /// Report only descriptor-owned capability facts and never provider internals.
@@ -175,8 +184,7 @@ impl SystemService for MediaTranscriptionSystemServiceProvider {
             warn!(service_id = MEDIA_TRANSCRIPTION_SERVICE_ID, command = operation, trace_id = %trace.trace_id, reason_code = %reason, "media transcription provider unavailable");
             return Err(ServiceError::ServiceUnavailable(reason.clone()));
         }
-        if let Err(rejection) = admit_transcription_operation(operation, preflight_facts(&command))
-        {
+        if let Err(rejection) = admit_transcription_operation(operation, self.admission_facts) {
             self.emit(operation, &trace.trace_id, "preflight_rejected");
             warn!(service_id = MEDIA_TRANSCRIPTION_SERVICE_ID, command = operation, trace_id = %trace.trace_id, rejection = ?rejection, "media transcription command rejected before provider dispatch");
             return Err(preflight_error(rejection));
@@ -221,37 +229,16 @@ impl SystemService for MediaTranscriptionSystemServiceProvider {
     }
 }
 
-/// Read only bounded host-issued admission facts. Raw audio and transcript
-/// payloads are intentionally unavailable to the preflight evaluation.
-fn preflight_facts(command: &ServiceCommand) -> TranscriptionPreflightFacts {
-    let enabled = |key: &str, default: bool| {
-        command
-            .metadata
-            .get(key)
-            .map_or(default, |value| value == "true")
-    };
-    TranscriptionPreflightFacts {
-        permission_granted: enabled("permission_granted", true),
-        provider_available: enabled("provider_available", true),
-        source_consent_granted: enabled("source_consent_granted", true),
-        approval_granted: enabled("approval_granted", true),
-        sensitive_source: enabled("sensitive_source", false),
-        requested_units: command
-            .metadata
-            .get("requested_units")
-            .and_then(|value| value.parse().ok())
-            .unwrap_or(1),
-        reserved_units: command
-            .metadata
-            .get("reserved_units")
-            .and_then(|value| value.parse().ok())
-            .unwrap_or(1),
-    }
-}
-
 fn preflight_error(rejection: TranscriptionPreflightFailure) -> ServiceError {
     match rejection {
-        TranscriptionPreflightFailure::Denied | TranscriptionPreflightFailure::ApprovalRequired => {
+        TranscriptionPreflightFailure::Denied
+        | TranscriptionPreflightFailure::ApprovalRequired
+        | TranscriptionPreflightFailure::PolicyDenied
+        | TranscriptionPreflightFailure::EntitlementDenied
+        | TranscriptionPreflightFailure::RedactionDenied
+        | TranscriptionPreflightFailure::TranslationDenied
+        | TranscriptionPreflightFailure::ExportDenied
+        | TranscriptionPreflightFailure::ArtifactDenied => {
             ServiceError::DisabledByPolicy(format!("transcription_{rejection:?}").to_lowercase())
         }
         TranscriptionPreflightFailure::Unavailable => {
@@ -259,6 +246,17 @@ fn preflight_error(rejection: TranscriptionPreflightFailure) -> ServiceError {
         }
         TranscriptionPreflightFailure::QuotaExceeded => {
             ServiceError::AdapterFailure("transcription_quota_exceeded".into())
+        }
+        TranscriptionPreflightFailure::SchemaMismatch
+        | TranscriptionPreflightFailure::FormatUnsupported
+        | TranscriptionPreflightFailure::LanguageUnsupported
+        | TranscriptionPreflightFailure::ModelUnsupported
+        | TranscriptionPreflightFailure::DiarizationUnsupported
+        | TranscriptionPreflightFailure::TimestampUnsupported => {
+            ServiceError::UnsupportedCommand(format!("transcription_{rejection:?}").to_lowercase())
+        }
+        TranscriptionPreflightFailure::Timeout | TranscriptionPreflightFailure::Cancellation => {
+            ServiceError::AdapterFailure(format!("transcription_{rejection:?}").to_lowercase())
         }
     }
 }

@@ -2,7 +2,10 @@
 
 use macaca_kernel::SystemService;
 use macaca_proto::media_transcription::MEDIA_TRANSCRIPTION_COMMANDS;
-use macaca_proto::{ServiceCommand, ServiceCommandName, ServiceError, ServiceHealth, TraceContext};
+use macaca_proto::{
+    ServiceCommand, ServiceCommandName, ServiceError, ServiceHealth, TraceContext,
+    TranscriptionPreflightFacts,
+};
 
 use super::media_transcription_service_provider::MediaTranscriptionSystemServiceProvider;
 
@@ -61,7 +64,12 @@ async fn unavailable_provider_fails_closed_for_every_declared_command() {
 
 #[tokio::test]
 async fn unknown_command_is_structured_unsupported() {
-    let provider = MediaTranscriptionSystemServiceProvider::mock();
+    let provider = MediaTranscriptionSystemServiceProvider::mock().with_admission_facts(
+        TranscriptionPreflightFacts {
+            permission_granted: false,
+            ..TranscriptionPreflightFacts::permissive()
+        },
+    );
     let error = provider
         .call(ServiceCommand::with_trace(
             ServiceCommandName::new("transcription.provider_native"),
@@ -75,20 +83,95 @@ async fn unknown_command_is_structured_unsupported() {
 
 #[tokio::test]
 async fn preflight_rejections_do_not_complete_provider_work() {
-    let provider = MediaTranscriptionSystemServiceProvider::mock();
+    let provider = MediaTranscriptionSystemServiceProvider::mock().with_admission_facts(
+        TranscriptionPreflightFacts {
+            permission_granted: false,
+            ..TranscriptionPreflightFacts::permissive()
+        },
+    );
     let mut events = provider.subscribe();
-    let mut command = ServiceCommand::with_trace(
+    let command = ServiceCommand::with_trace(
         ServiceCommandName::new("transcription.batch_request"),
         serde_json::json!({"raw_audio":"must-not-process"}),
         TraceContext::new("transcription-preflight"),
     );
-    command
-        .metadata
-        .insert("permission_granted".into(), "false".into());
     let error = provider.call(command).await.unwrap_err();
     assert!(matches!(error, ServiceError::DisabledByPolicy(_)));
     let event = events.recv().await.unwrap();
     assert_eq!(event.outcome, "preflight_rejected");
+}
+
+#[tokio::test]
+async fn host_issued_rejections_never_complete_or_observe_transcription_payloads() {
+    let rejected = [
+        TranscriptionPreflightFacts {
+            scope_granted: false,
+            ..TranscriptionPreflightFacts::permissive()
+        },
+        TranscriptionPreflightFacts {
+            policy_granted: false,
+            ..TranscriptionPreflightFacts::permissive()
+        },
+        TranscriptionPreflightFacts {
+            entitlement_granted: false,
+            ..TranscriptionPreflightFacts::permissive()
+        },
+        TranscriptionPreflightFacts {
+            schema_valid: false,
+            ..TranscriptionPreflightFacts::permissive()
+        },
+        TranscriptionPreflightFacts {
+            language_supported: false,
+            ..TranscriptionPreflightFacts::permissive()
+        },
+        TranscriptionPreflightFacts {
+            diarization_supported: false,
+            ..TranscriptionPreflightFacts::permissive()
+        },
+        TranscriptionPreflightFacts {
+            redaction_allowed: false,
+            ..TranscriptionPreflightFacts::permissive()
+        },
+        TranscriptionPreflightFacts {
+            translation_allowed: false,
+            ..TranscriptionPreflightFacts::permissive()
+        },
+        TranscriptionPreflightFacts {
+            requested_units: 2,
+            reserved_units: 1,
+            ..TranscriptionPreflightFacts::permissive()
+        },
+        TranscriptionPreflightFacts {
+            approval_required: true,
+            approval_granted: false,
+            ..TranscriptionPreflightFacts::permissive()
+        },
+        TranscriptionPreflightFacts {
+            within_timeout: false,
+            ..TranscriptionPreflightFacts::permissive()
+        },
+        TranscriptionPreflightFacts {
+            cancellation_requested: true,
+            ..TranscriptionPreflightFacts::permissive()
+        },
+    ];
+    for (index, facts) in rejected.into_iter().enumerate() {
+        let provider = MediaTranscriptionSystemServiceProvider::mock().with_admission_facts(facts);
+        let mut events = provider.subscribe();
+        let marker = "must-not-enter-transcription-provider";
+        assert!(provider
+            .call(ServiceCommand::with_trace(
+                ServiceCommandName::new("transcription.batch_request"),
+                serde_json::json!({"raw_audio":marker,"raw_transcript":marker}),
+                TraceContext::new(format!("transcription-rejected-{index}"))
+            ))
+            .await
+            .is_err());
+        let event = events.recv().await.unwrap();
+        assert_eq!(event.outcome, "preflight_rejected");
+        assert!(!event.command.contains(marker));
+        assert!(!event.replay_ref.contains(marker));
+    }
 }
 
 #[tokio::test]
