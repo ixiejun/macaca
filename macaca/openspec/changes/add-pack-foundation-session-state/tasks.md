@@ -94,13 +94,13 @@
 - [x] 6.1 Emit sanitized events for declaration, admission, policy, resource,
   service calls, checkpoint creation, restore, compaction, clear, success,
   failure, denied, and unavailable states.
-- [ ] 6.2 Add audit redaction tests proving raw state values, raw secrets, prompts,
+- [x] 6.2 Add audit redaction tests proving raw state values, raw secrets, prompts,
   manifests, package bytes, credentials, private keys, provider payloads, and
   unbounded output do not enter observability surfaces.
 - [ ] 6.3 Add restart/replay tests proving session-state commands are
   trace-addressable and can reconstruct recovery decisions without replaying raw
   state payloads.
-- [ ] 6.4 Add dependency-boundary tests proving kernel, SDK, shells, and
+- [x] 6.4 Add dependency-boundary tests proving kernel, SDK, shells, and
   application framework do not import concrete session-state providers.
 - [ ] 6.5 Add no-direct-provider-call gates proving SDK helpers and WASM host
   imports cannot bypass service runtime.

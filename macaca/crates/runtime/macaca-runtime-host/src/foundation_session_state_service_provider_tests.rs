@@ -46,8 +46,14 @@ async fn session_state_commands_are_traceable_without_raw_state_echo() {
                     ServiceCommandName::new(*command),
                     serde_json::json!({
                         "raw_state": "secret-marker",
-                        "prompt": "private-marker",
-                        "provider_payload": "raw-marker"
+                        "raw_secret": "secret-reference-marker",
+                        "prompt": "private-prompt-marker",
+                        "manifest": "manifest-bytes-marker",
+                        "package_bytes": "package-bytes-marker",
+                        "credentials": "credential-marker",
+                        "private_key": "private-key-marker",
+                        "provider_payload": "provider-payload-marker",
+                        "unbounded_output": "unbounded-output-marker".repeat(2_048)
                     }),
                     TraceContext::new(trace_id.clone()),
                 ),
@@ -62,9 +68,22 @@ async fn session_state_commands_are_traceable_without_raw_state_echo() {
         }));
     }
     let observable = format!("{:?}", events.events().unwrap());
-    assert!(!observable.contains("secret-marker"));
-    assert!(!observable.contains("private-marker"));
-    assert!(!observable.contains("raw-marker"));
+    for marker in [
+        "secret-marker",
+        "secret-reference-marker",
+        "private-prompt-marker",
+        "manifest-bytes-marker",
+        "package-bytes-marker",
+        "credential-marker",
+        "private-key-marker",
+        "provider-payload-marker",
+        "unbounded-output-marker",
+    ] {
+        assert!(
+            !observable.contains(marker),
+            "observability leaked {marker}"
+        );
+    }
 }
 
 #[tokio::test]
