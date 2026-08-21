@@ -21,6 +21,34 @@ pub enum TranscriptionStreamState {
     Unavailable,
 }
 
+/// Bounded asynchronous job lifecycle for batch, redaction, export, and handoff work.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum TranscriptionJobState {
+    Planned,
+    Started,
+    Draining,
+    Finished,
+    Cancelled,
+    Failed,
+    TimedOut,
+    Unavailable,
+    Replay,
+}
+
+/// Generic job actions shared by all asynchronous transcription operations.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum TranscriptionJobAction {
+    Start,
+    Drain,
+    Finish,
+    Cancel,
+    Timeout,
+    Fail,
+    ResumeReplay,
+}
+
 /// Commands that change session state without carrying raw media.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
@@ -93,6 +121,48 @@ pub fn transition_transcription_stream(
     }
 }
 
+/// Advance an asynchronous job without exposing source, transcript, or artifact content.
+pub fn transition_transcription_job(
+    state: TranscriptionJobState,
+    action: TranscriptionJobAction,
+) -> Result<TranscriptionJobState, TranscriptionStreamTransitionFailure> {
+    match (state, action) {
+        (TranscriptionJobState::Planned, TranscriptionJobAction::Start) => {
+            Ok(TranscriptionJobState::Started)
+        }
+        (TranscriptionJobState::Started, TranscriptionJobAction::Drain) => {
+            Ok(TranscriptionJobState::Draining)
+        }
+        (TranscriptionJobState::Draining, TranscriptionJobAction::Finish) => {
+            Ok(TranscriptionJobState::Finished)
+        }
+        (
+            TranscriptionJobState::Planned
+            | TranscriptionJobState::Started
+            | TranscriptionJobState::Draining,
+            TranscriptionJobAction::Cancel,
+        ) => Ok(TranscriptionJobState::Cancelled),
+        (
+            TranscriptionJobState::Started | TranscriptionJobState::Draining,
+            TranscriptionJobAction::Timeout,
+        ) => Ok(TranscriptionJobState::TimedOut),
+        (
+            TranscriptionJobState::Planned
+            | TranscriptionJobState::Started
+            | TranscriptionJobState::Draining
+            | TranscriptionJobState::Replay,
+            TranscriptionJobAction::Fail,
+        ) => Ok(TranscriptionJobState::Failed),
+        (
+            TranscriptionJobState::Started
+            | TranscriptionJobState::Draining
+            | TranscriptionJobState::TimedOut,
+            TranscriptionJobAction::ResumeReplay,
+        ) => Ok(TranscriptionJobState::Replay),
+        _ => Err(TranscriptionStreamTransitionFailure::InvalidState),
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -132,6 +202,27 @@ mod tests {
                 cursor,
                 TranscriptionStreamAction::Append,
                 Some(cursor)
+            ),
+            Err(TranscriptionStreamTransitionFailure::InvalidState)
+        );
+    }
+
+    #[test]
+    fn job_state_models_cancellation_timeout_and_replay_without_payloads() {
+        let started = transition_transcription_job(
+            TranscriptionJobState::Planned,
+            TranscriptionJobAction::Start,
+        )
+        .unwrap();
+        let timed_out =
+            transition_transcription_job(started, TranscriptionJobAction::Timeout).unwrap();
+        let replay =
+            transition_transcription_job(timed_out, TranscriptionJobAction::ResumeReplay).unwrap();
+        assert_eq!(replay, TranscriptionJobState::Replay);
+        assert_eq!(
+            transition_transcription_job(
+                TranscriptionJobState::Finished,
+                TranscriptionJobAction::Cancel
             ),
             Err(TranscriptionStreamTransitionFailure::InvalidState)
         );

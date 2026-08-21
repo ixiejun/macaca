@@ -436,7 +436,8 @@ pub use super::knowledge_summarization_preflight::{
 };
 pub use super::media_common::{MediaCommandEnvelope, MediaError, MediaPage};
 pub use super::media_transcription_semantics::{
-    transition_transcription_stream, TranscriptionStreamAction, TranscriptionStreamState,
+    transition_transcription_job, transition_transcription_stream, TranscriptionJobAction,
+    TranscriptionJobState, TranscriptionStreamAction, TranscriptionStreamState,
     TranscriptionStreamTransitionFailure,
 };
 pub use super::media_transcription_validation::validate_transcription_permission_declarations;
