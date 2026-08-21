@@ -49,7 +49,7 @@
 - [x] 3.3 Add policy checks for session id, task id, key/prefix bounds, max state
   size, max checkpoint size, retention, restore mode, compaction bounds, export
   redaction, and provider capability.
-- [ ] 3.4 Add side-effect approval behavior for restore, clear, compaction, broad
+- [x] 3.4 Add side-effect approval behavior for restore, clear, compaction, broad
   export, and cross-session restore.
 - [x] 3.5 Reject raw secrets and require secret-reference interoperability for
   secret-classified state.

@@ -12,17 +12,18 @@ use async_trait::async_trait;
 use macaca_kernel::SystemService;
 use macaca_persist::PersistStore;
 use macaca_proto::{
-    domain_pack_command_trace, domain_pack_service_result, DomainPackProviderCapabilityState,
-    ServiceCallResult, ServiceCommand, ServiceDescriptor, ServiceError, ServiceHealth,
-    ServiceResult, SessionStateCheckpointRef, SessionStateClearSessionCommand,
-    SessionStateCompactHistoryCommand, SessionStateCompareCheckpointCommand,
-    SessionStateCreateCheckpointCommand, SessionStateDeleteCommand,
-    SessionStateExportRedactedCommand, SessionStateGetCommand, SessionStateInspectRecoveryCommand,
-    SessionStateKeyRef, SessionStateListCheckpointsCommand, SessionStateListKeysCommand,
-    SessionStateMergePatchCommand, SessionStateProviderCapability, SessionStateProviderSnapshot,
-    SessionStatePutCommand, SessionStateRecoveryMetadata, SessionStateRestoreCheckpointCommand,
-    SessionStateRetentionPolicy, SessionStateRevision, SessionStateSessionRef,
-    SessionStateValueRef, FOUNDATION_SESSION_STATE_COMMANDS, FOUNDATION_SESSION_STATE_SERVICE_ID,
+    approve_session_state_operation, domain_pack_command_trace, domain_pack_service_result,
+    DomainPackProviderCapabilityState, ServiceCallResult, ServiceCommand, ServiceDescriptor,
+    ServiceError, ServiceHealth, ServiceResult, SessionStateApprovalFacts,
+    SessionStateCheckpointRef, SessionStateClearSessionCommand, SessionStateCompactHistoryCommand,
+    SessionStateCompareCheckpointCommand, SessionStateCreateCheckpointCommand,
+    SessionStateDeleteCommand, SessionStateExportRedactedCommand, SessionStateGetCommand,
+    SessionStateInspectRecoveryCommand, SessionStateKeyRef, SessionStateListCheckpointsCommand,
+    SessionStateListKeysCommand, SessionStateMergePatchCommand, SessionStateProviderCapability,
+    SessionStateProviderSnapshot, SessionStatePutCommand, SessionStateRecoveryMetadata,
+    SessionStateRestoreCheckpointCommand, SessionStateRetentionPolicy, SessionStateRevision,
+    SessionStateSessionRef, SessionStateValueRef, FOUNDATION_SESSION_STATE_COMMANDS,
+    FOUNDATION_SESSION_STATE_SERVICE_ID,
 };
 use serde::{Deserialize, Serialize};
 use tokio::sync::{broadcast, Mutex};
@@ -169,6 +170,24 @@ impl EmbeddedFoundationSessionStateProvider {
         let operation = command.name.as_str();
         if !FOUNDATION_SESSION_STATE_COMMANDS.contains(&operation) {
             return Err(ServiceError::UnsupportedCommand(operation.into()));
+        }
+        // Approval is a provider-neutral Specification and runs before the
+        // mutation lock, persistence read, or any provider side effect.
+        let facts = approval_facts(operation, &command);
+        if approve_session_state_operation(operation, facts).is_err() {
+            let _ = self.events.send(event(
+                operation,
+                &trace.trace_id,
+                SessionStateRuntimeEventKind::PolicyDecision,
+            ));
+            warn!(
+                service_id = FOUNDATION_SESSION_STATE_SERVICE_ID,
+                command = operation,
+                trace_id = %trace.trace_id,
+                reason_code = "approval_required",
+                "session state command denied before provider side effect"
+            );
+            return Err(ServiceError::DisabledByPolicy("approval_required".into()));
         }
         let _mutation = self.mutations.lock().await;
         let output = match operation {
@@ -450,6 +469,49 @@ impl EmbeddedFoundationSessionStateProvider {
             recovery_state: "durable".into(),
         };
         Ok(serde_json::to_value(metadata).map_err(json_error)?)
+    }
+}
+
+/// Convert only bounded command metadata into approval facts. Approval evidence
+/// itself is an opaque reference owned by the policy service and is never logged.
+fn approval_facts(operation: &str, command: &ServiceCommand) -> SessionStateApprovalFacts {
+    let approval_granted = command
+        .metadata
+        .get("approval_granted")
+        .is_some_and(|value| value == "true")
+        && command
+            .metadata
+            .get("approval_source")
+            .is_some_and(|value| value == "policy")
+        && command
+            .metadata
+            .get("approval_ref")
+            .is_some_and(|value| !value.is_empty() && value.len() <= 128);
+    let policy_requires_approval = command
+        .metadata
+        .get("policy_requires_approval")
+        .is_some_and(|value| value == "true");
+    let cross_session_restore = operation == "session_state.restore_checkpoint"
+        && command.payload["plan"]["cross_session_allowed"] == true;
+    let broad_export = operation == "session_state.export_redacted"
+        && command.payload["redaction_level"] != "strict";
+    let destructive_history_mutation = matches!(
+        operation,
+        "session_state.restore_checkpoint"
+            | "session_state.clear_session"
+            | "session_state.compact_history"
+    ) && command
+        .payload
+        .get("dry_run")
+        .and_then(serde_json::Value::as_bool)
+        != Some(true)
+        && command.payload["plan"]["dry_run"] != true;
+    SessionStateApprovalFacts {
+        cross_session_restore,
+        broad_export,
+        destructive_history_mutation,
+        policy_requires_approval,
+        approval_granted,
     }
 }
 

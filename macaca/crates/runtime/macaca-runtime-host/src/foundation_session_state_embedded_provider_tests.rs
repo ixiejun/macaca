@@ -1,6 +1,5 @@
 //! Restart, conflict, checkpoint, and redaction tests for the durable session-state Strategy.
 
-use std::collections::BTreeMap;
 use std::sync::Arc;
 
 use async_trait::async_trait;
@@ -9,6 +8,7 @@ use macaca_proto::{
     MacacaResult, ServiceCommand, ServiceCommandName, SessionStateKeyRef, SessionStatePutCommand,
     SessionStateRetentionPolicy, SessionStateSessionRef, SessionStateValueRef, TraceContext,
 };
+use std::collections::BTreeMap;
 use tokio::sync::Mutex;
 
 use super::foundation_session_state_embedded_provider::EmbeddedFoundationSessionStateProvider;
@@ -67,6 +67,24 @@ fn put_command(trace_id: &str, value_ref: &str) -> ServiceCommand {
         .unwrap(),
         TraceContext::new(trace_id),
     )
+}
+
+fn command_with_metadata(
+    name: &str,
+    payload: serde_json::Value,
+    trace_id: &str,
+    metadata: &[(&str, &str)],
+) -> ServiceCommand {
+    let mut command = ServiceCommand::with_trace(
+        ServiceCommandName::new(name),
+        payload,
+        TraceContext::new(trace_id),
+    );
+    command.metadata = metadata
+        .iter()
+        .map(|(key, value)| ((*key).into(), (*value).into()))
+        .collect::<BTreeMap<_, _>>();
+    command
 }
 
 #[tokio::test]
@@ -162,4 +180,99 @@ async fn checkpoint_restore_supports_dry_run_and_revision_conflicts() {
         .unwrap_err();
     assert!(conflict.to_string().contains("revision conflict"));
     assert_eq!(initial.output["status"], "ok");
+}
+
+#[tokio::test]
+async fn denied_sensitive_operations_do_not_mutate_durable_state() {
+    let provider =
+        EmbeddedFoundationSessionStateProvider::new(Arc::new(MemoryPersistStore::default()));
+    provider
+        .call(put_command("approval-seed", "artifact:seed"))
+        .await
+        .unwrap();
+    let checkpoint = provider
+        .call(ServiceCommand::with_trace(
+            ServiceCommandName::new("session_state.create_checkpoint"),
+            serde_json::json!({
+                "session": session(),
+                "retention": SessionStateRetentionPolicy {
+                    ttl_seconds: None,
+                    max_checkpoints: 4,
+                    compact_after_revisions: 20,
+                }
+            }),
+            TraceContext::new("approval-checkpoint"),
+        ))
+        .await
+        .unwrap();
+    let checkpoint_ref = checkpoint.output["checkpoint_ref"].clone();
+    let before = provider.snapshot().await.unwrap();
+
+    let denied = [
+        command_with_metadata(
+            "session_state.restore_checkpoint",
+            serde_json::json!({
+                "plan": {"checkpoint": checkpoint_ref, "dry_run": false, "cross_session_allowed": true}
+            }),
+            "denied-cross-session",
+            &[],
+        ),
+        command_with_metadata(
+            "session_state.compact_history",
+            serde_json::json!({
+                "session": session(),
+                "before_revision": {"revision_id": "revision:before", "previous_revision_id": null},
+                "dry_run": false
+            }),
+            "denied-compact",
+            &[],
+        ),
+        command_with_metadata(
+            "session_state.clear_session",
+            serde_json::json!({"session": session(), "dry_run": false}),
+            "denied-clear",
+            &[],
+        ),
+        command_with_metadata(
+            "session_state.export_redacted",
+            serde_json::json!({"session": session(), "redaction_level": "diagnostic"}),
+            "denied-export",
+            &[],
+        ),
+    ];
+    for command in denied {
+        let error = provider.call(command).await.unwrap_err();
+        assert!(error.to_string().contains("approval_required"));
+        assert_eq!(provider.snapshot().await.unwrap(), before);
+    }
+}
+
+#[tokio::test]
+async fn approved_clear_is_allowed_after_policy_evidence() {
+    let provider =
+        EmbeddedFoundationSessionStateProvider::new(Arc::new(MemoryPersistStore::default()));
+    provider
+        .call(put_command("approved-seed", "artifact:seed"))
+        .await
+        .unwrap();
+    let result = provider
+        .call(command_with_metadata(
+            "session_state.clear_session",
+            serde_json::json!({"session": session(), "dry_run": false}),
+            "approved-clear",
+            &[
+                ("approval_granted", "true"),
+                ("approval_source", "policy"),
+                ("approval_ref", "approval:clear-session"),
+            ],
+        ))
+        .await
+        .unwrap();
+    assert_eq!(result.output["status"], "ok");
+    assert!(provider
+        .snapshot()
+        .await
+        .unwrap()
+        .revision_hashes
+        .is_empty());
 }

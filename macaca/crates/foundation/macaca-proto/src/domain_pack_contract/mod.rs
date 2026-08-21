@@ -101,6 +101,7 @@ mod foundation_secrets_reference_manifest_validation;
 pub mod foundation_secrets_reference_semantics;
 mod foundation_secrets_reference_validation;
 mod foundation_session_state;
+pub mod foundation_session_state_semantics;
 mod foundation_session_state_validation;
 mod foundation_time;
 pub mod foundation_time_semantics;

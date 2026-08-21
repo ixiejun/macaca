@@ -303,6 +303,10 @@ pub use super::foundation_session_state::{
     SessionStateSessionRef, SessionStateValueRef, FOUNDATION_SESSION_STATE_COMMANDS,
     FOUNDATION_SESSION_STATE_PACK_ID, FOUNDATION_SESSION_STATE_SERVICE_ID,
 };
+pub use super::foundation_session_state_semantics::{
+    approve_session_state_operation, requires_session_state_approval, SessionStateApprovalFacts,
+    SessionStateApprovalFailure,
+};
 pub use super::foundation_session_state_validation::validate_session_state_declarations;
 pub use super::foundation_time::{
     foundation_time_descriptor_hashes, foundation_time_pack_definition, time_stable_hash,
