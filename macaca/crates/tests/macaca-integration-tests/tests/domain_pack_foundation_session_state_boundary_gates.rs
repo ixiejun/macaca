@@ -9,6 +9,7 @@ const SURFACES: &[&str] = &[
     "crates/shells",
     "crates/application/macaca-app/src",
     "crates/runtime/macaca-framework/src",
+    "crates/runtime/macaca-runtime-host/src/wasm_runtime_provider",
 ];
 const FORBIDDEN: &[&str] = &[
     "FoundationSessionStateSystemServiceProvider",

@@ -102,7 +102,7 @@
   state payloads.
 - [x] 6.4 Add dependency-boundary tests proving kernel, SDK, shells, and
   application framework do not import concrete session-state providers.
-- [ ] 6.5 Add no-direct-provider-call gates proving SDK helpers and WASM host
+- [x] 6.5 Add no-direct-provider-call gates proving SDK helpers and WASM host
   imports cannot bypass service runtime.
 - [ ] 6.6 Run `openspec validate add-pack-foundation-session-state --strict`,
   targeted cargo tests, dependency-boundary gates, file-size gates, and audit
