@@ -58,12 +58,12 @@
 
 ## 4. Service Provider And Runtime Integration
 
-- [ ] 4.1 Define the session-state service trait/provider interface behind the
+- [x] 4.1 Define the session-state service trait/provider interface behind the
   service runtime.
 - [x] 4.2 Implement unavailable provider behavior for absent session-state service,
   disabled checkpoint/restore/compaction/export support, missing retention
   support, and provider health failure.
-- [ ] 4.3 Implement deterministic mock provider for contract and replay tests.
+- [x] 4.3 Implement deterministic mock provider for contract and replay tests.
 - [ ] 4.4 Implement or bind embedded durable provider with revision tracking,
   checkpoint references, retention enforcement, compaction, and restore dry-run.
 - [ ] 4.5 Add optional remote session store/replay provider bridge points without
@@ -91,7 +91,7 @@
 
 ## 6. Trace, Audit, Replay, And Gates
 
-- [ ] 6.1 Emit sanitized events for declaration, admission, policy, resource,
+- [x] 6.1 Emit sanitized events for declaration, admission, policy, resource,
   service calls, checkpoint creation, restore, compaction, clear, success,
   failure, denied, and unavailable states.
 - [ ] 6.2 Add audit redaction tests proving raw state values, raw secrets, prompts,
