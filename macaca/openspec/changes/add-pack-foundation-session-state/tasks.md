@@ -64,11 +64,11 @@
   disabled checkpoint/restore/compaction/export support, missing retention
   support, and provider health failure.
 - [x] 4.3 Implement deterministic mock provider for contract and replay tests.
-- [ ] 4.4 Implement or bind embedded durable provider with revision tracking,
+- [x] 4.4 Implement or bind embedded durable provider with revision tracking,
   checkpoint references, retention enforcement, compaction, and restore dry-run.
 - [ ] 4.5 Add optional remote session store/replay provider bridge points without
   leaking provider-native APIs to SDK callers.
-- [ ] 4.6 Add lifecycle, health, snapshot, shutdown, retention cleanup, compaction,
+- [x] 4.6 Add lifecycle, health, snapshot, shutdown, retention cleanup, compaction,
   restore, redaction, and provider capability reports.
 
 ## 5. SDK, WASM ABI, And Application Framework
@@ -97,14 +97,14 @@
 - [x] 6.2 Add audit redaction tests proving raw state values, raw secrets, prompts,
   manifests, package bytes, credentials, private keys, provider payloads, and
   unbounded output do not enter observability surfaces.
-- [ ] 6.3 Add restart/replay tests proving session-state commands are
+- [x] 6.3 Add restart/replay tests proving session-state commands are
   trace-addressable and can reconstruct recovery decisions without replaying raw
   state payloads.
 - [x] 6.4 Add dependency-boundary tests proving kernel, SDK, shells, and
   application framework do not import concrete session-state providers.
 - [x] 6.5 Add no-direct-provider-call gates proving SDK helpers and WASM host
   imports cannot bypass service runtime.
-- [ ] 6.6 Run `openspec validate add-pack-foundation-session-state --strict`,
+- [x] 6.6 Run `openspec validate add-pack-foundation-session-state --strict`,
   targeted cargo tests, dependency-boundary gates, file-size gates, and audit
   replay checks before marking complete.
 

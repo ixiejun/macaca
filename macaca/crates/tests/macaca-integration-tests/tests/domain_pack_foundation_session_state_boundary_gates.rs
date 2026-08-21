@@ -13,6 +13,7 @@ const SURFACES: &[&str] = &[
 ];
 const FORBIDDEN: &[&str] = &[
     "FoundationSessionStateSystemServiceProvider",
+    "EmbeddedFoundationSessionStateProvider",
     "foundation_session_state_service_provider",
     "raw_state",
 ];
