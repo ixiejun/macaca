@@ -101,7 +101,11 @@ impl DeviceCameraSystemServiceProvider {
             ),
             ("snapshot_schema".into(), "device.camera.replay.v1".into()),
         ]);
-        self.emit("camera.snapshot", "snapshot:provider", "snapshot_recorded");
+        self.emit(
+            "camera.snapshot_recorded",
+            "snapshot:provider",
+            "snapshot_recorded",
+        );
         info!(
             service_id = DEVICE_CAMERA_SERVICE_ID,
             "device camera provider snapshot recorded"
@@ -109,9 +113,10 @@ impl DeviceCameraSystemServiceProvider {
         snapshot
     }
 
-    fn emit(&self, command: &str, trace_id: &str, outcome: &'static str) {
+    /// Publish one canonical audit event without retaining provider payloads.
+    fn emit(&self, event: &str, trace_id: &str, outcome: &'static str) {
         let _ = self.events.send(CameraRuntimeEvent {
-            command: command.into(),
+            command: event.into(),
             trace_id: trace_id.into(),
             replay_ref: format!("replay:camera:{trace_id}"),
             outcome,
@@ -158,23 +163,31 @@ impl SystemService for DeviceCameraSystemServiceProvider {
         let trace = domain_pack_command_trace(&command)?;
         let operation = command.name.as_str();
         if !DEVICE_CAMERA_COMMANDS.contains(&operation) {
-            self.emit(operation, &trace.trace_id, "unsupported");
+            self.emit("camera.command_failed", &trace.trace_id, "unsupported");
             return Err(ServiceError::UnsupportedCommand(operation.into()));
         }
         if let Some(reason) = &self.unavailable_reason {
-            self.emit(operation, &trace.trace_id, "unavailable");
+            self.emit("camera.unavailable", &trace.trace_id, "unavailable");
             warn!(service_id = DEVICE_CAMERA_SERVICE_ID, command = operation, trace_id = %trace.trace_id, reason_code = %reason, "device camera provider unavailable");
             return Err(ServiceError::ServiceUnavailable(reason.clone()));
         }
         if let Err(rejection) = admit_camera_operation(self.admission_facts) {
-            self.emit(operation, &trace.trace_id, "preflight_rejected");
+            self.emit(
+                "camera.policy_decision",
+                &trace.trace_id,
+                "preflight_rejected",
+            );
             warn!(service_id = DEVICE_CAMERA_SERVICE_ID, command = operation, trace_id = %trace.trace_id, rejection = ?rejection, "device camera command rejected before adapter dispatch");
             return Err(preflight_error(rejection));
         }
         self.lifecycle
             .record_completion(operation, &trace.trace_id)
             .await;
-        self.emit(operation, &trace.trace_id, "completed");
+        self.emit(
+            camera_success_event(operation),
+            &trace.trace_id,
+            "completed",
+        );
         info!(service_id = DEVICE_CAMERA_SERVICE_ID, command = operation, trace_id = %trace.trace_id, "device camera command completed with synthetic references");
         Ok(domain_pack_service_result(
             serde_json::json!({"status":"reference_only","operation":operation,"result_ref":format!("camera-reference:{}", trace.trace_id)}),
@@ -208,6 +221,24 @@ impl SystemService for DeviceCameraSystemServiceProvider {
                     reason: reason.clone(),
                 }
             }))
+    }
+}
+
+/// Map provider-neutral commands to the stable, sanitized camera audit taxonomy.
+fn camera_success_event(operation: &str) -> &'static str {
+    match operation {
+        "camera.inspect_authorization" | "camera.request_authorization" => {
+            "camera.authorization_requested"
+        }
+        "camera.open_session" => "camera.session_opened",
+        "camera.start_preview" => "camera.preview_started",
+        "camera.capture_photo" => "camera.photo_captured",
+        "camera.start_recording" => "camera.recording_started",
+        "camera.stop_recording" => "camera.recording_stopped",
+        "camera.read_frame" => "camera.frame_reference_created",
+        "camera.set_controls" => "camera.controls_changed",
+        "camera.close_session" => "camera.session_closed",
+        _ => "camera.command_completed",
     }
 }
 

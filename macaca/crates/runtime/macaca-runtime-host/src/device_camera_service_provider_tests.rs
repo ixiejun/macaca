@@ -25,7 +25,10 @@ async fn camera_commands_are_traceable_and_do_not_echo_frames_or_media() {
             .unwrap();
         assert_eq!(result.output["status"], "reference_only");
         assert!(!result.output.to_string().contains(marker));
-        assert_eq!(events.recv().await.unwrap().outcome, "completed");
+        let event = events.recv().await.unwrap();
+        assert_eq!(event.outcome, "completed");
+        assert!(event.command.starts_with("camera."));
+        assert!(!event.replay_ref.contains(marker));
     }
 }
 
@@ -52,7 +55,9 @@ async fn unavailable_camera_fails_closed_and_snapshot_is_bounded() {
     }
     let snapshot = provider.snapshot().await;
     assert_eq!(snapshot["snapshot_schema"], "device.camera.replay.v1");
-    assert_eq!(events.recv().await.unwrap().outcome, "snapshot_recorded");
+    let event = events.recv().await.unwrap();
+    assert_eq!(event.command, "camera.snapshot_recorded");
+    assert_eq!(event.outcome, "snapshot_recorded");
 }
 
 #[tokio::test]
@@ -116,6 +121,36 @@ async fn host_rejections_do_not_complete_camera_work() {
             ))
             .await
             .is_err());
-        assert_eq!(events.recv().await.unwrap().outcome, "preflight_rejected");
+        let event = events.recv().await.unwrap();
+        assert_eq!(event.command, "camera.policy_decision");
+        assert_eq!(event.outcome, "preflight_rejected");
+    }
+}
+
+#[tokio::test]
+async fn canonical_camera_operations_emit_sanitized_audit_taxonomy() {
+    let provider = DeviceCameraSystemServiceProvider::mock();
+    let mut events = provider.subscribe();
+    for (operation, expected_event) in [
+        ("camera.open_session", "camera.session_opened"),
+        ("camera.start_preview", "camera.preview_started"),
+        ("camera.capture_photo", "camera.photo_captured"),
+        ("camera.start_recording", "camera.recording_started"),
+        ("camera.stop_recording", "camera.recording_stopped"),
+        ("camera.read_frame", "camera.frame_reference_created"),
+        ("camera.set_controls", "camera.controls_changed"),
+        ("camera.close_session", "camera.session_closed"),
+    ] {
+        provider
+            .call(ServiceCommand::with_trace(
+                ServiceCommandName::new(operation),
+                serde_json::json!({"media_bytes":"must-not-appear"}),
+                TraceContext::new(operation),
+            ))
+            .await
+            .unwrap();
+        let event = events.recv().await.unwrap();
+        assert_eq!(event.command, expected_event);
+        assert!(!event.replay_ref.contains("must-not-appear"));
     }
 }
