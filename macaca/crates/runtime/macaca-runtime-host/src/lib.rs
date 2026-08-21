@@ -49,6 +49,7 @@ pub mod autonomy_supervisor;
 pub mod calendar_service_provider;
 pub mod citation_service_provider;
 pub mod code_intelligence_service_provider;
+pub mod commerce_cart_service_provider;
 pub mod composed_agent_execution_backend;
 pub(crate) mod config_service_commands;
 pub mod config_service_provider;
@@ -242,6 +243,8 @@ mod calendar_service_provider_tests;
 mod citation_service_provider_tests;
 #[cfg(test)]
 mod code_intelligence_service_provider_tests;
+#[cfg(test)]
+mod commerce_cart_service_provider_tests;
 #[cfg(test)]
 mod config_service_provider_tests;
 #[cfg(test)]
