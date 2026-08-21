@@ -78,7 +78,7 @@
   availability, health, diagnostics, and docs link.
 - [x] 5.2 Add SDK command builders for every `session_state.*` command; builders
   must only produce canonical traced service calls.
-- [ ] 5.3 Add SDK helpers for get/put, merge patch, checkpoint creation, restore
+- [x] 5.3 Add SDK helpers for get/put, merge patch, checkpoint creation, restore
   dry-run, checkpoint comparison, compaction, clear, recovery inspection, and
   unavailable diagnostics.
 - [ ] 5.4 Extend effective capability projection so applications can inspect

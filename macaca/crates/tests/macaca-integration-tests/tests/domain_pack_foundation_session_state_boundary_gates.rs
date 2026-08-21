@@ -15,6 +15,7 @@ const FORBIDDEN: &[&str] = &[
     "FoundationSessionStateSystemServiceProvider",
     "EmbeddedFoundationSessionStateProvider",
     "foundation_session_state_service_provider",
+    "foundation_session_state_embedded_provider",
     "raw_state",
 ];
 

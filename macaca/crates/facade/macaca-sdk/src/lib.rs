@@ -30,6 +30,7 @@ pub mod foundation_key_value_state_client;
 mod foundation_key_value_state_watch;
 pub mod foundation_random_client;
 pub mod foundation_secrets_reference_client;
+pub mod foundation_session_state_client;
 pub mod foundation_time_client;
 pub mod heartbeat_client;
 pub mod interaction_client;
@@ -374,6 +375,13 @@ pub use foundation_secrets_reference_client::{
     secrets_reference_resolve_for_provider_command, secrets_reference_revoke_lease_command,
     secrets_reference_rotate_command, secrets_reference_unavailable_diagnostic,
     SecretsReferenceDomainPackCommandBuilder,
+};
+pub use foundation_session_state_client::{
+    session_state_clear_dry_run_command, session_state_compact_dry_run_command,
+    session_state_create_checkpoint_command, session_state_get_command,
+    session_state_merge_patch_command, session_state_put_command,
+    session_state_restore_dry_run_command, session_state_unavailable_diagnostics,
+    session_state_validate_page_size, SessionStateDomainPackCommandBuilder,
 };
 pub use foundation_time_client::{
     clock_health_command, deadline_evaluation_command, localized_format_command,
