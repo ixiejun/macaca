@@ -71,7 +71,7 @@
 
 ## 8. Boundary, Quality, And Validation Gates
 
-- [ ] 8.1 Add dependency gates proving kernel, SDK, shells, and generic application framework do not import concrete cart providers.
+- [x] 8.1 Add dependency gates proving kernel, SDK, shells, and generic application framework do not import concrete cart providers.
 - [x] 8.2 Add no-direct-provider-call tests proving all callable operations traverse descriptor-owned service registration and typed service commands.
 - [ ] 8.3 Add canonical execution-path tests covering read-only, context update, line mutation, discount, estimate, validation, handoff, export, denied, unavailable, unsupported, conflict, quota, and stale-data paths.
 - [ ] 8.4 Add provider replacement tests for built-in, plugin, remote, mock, and unavailable providers.

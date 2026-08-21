@@ -114,3 +114,30 @@ async fn cart_snapshot_is_bounded_and_shutdown_releases_references() {
     provider.shutdown().await.unwrap();
     assert_eq!(provider.snapshot().await["active_reference_count"], "0");
 }
+
+#[tokio::test]
+async fn cart_events_cover_policy_mutation_handoff_and_snapshot_nodes() {
+    let provider = CommerceCartSystemServiceProvider::mock();
+    let mut events = provider.subscribe();
+    provider
+        .call(ServiceCommand::with_trace(
+            ServiceCommandName::new("cart.plan_handoff"),
+            serde_json::json!({}),
+            TraceContext::new("cart-event"),
+        ))
+        .await
+        .unwrap();
+    let kinds = (0..9)
+        .filter_map(|_| events.try_recv().ok())
+        .map(|event| event.kind)
+        .collect::<Vec<_>>();
+    assert!(kinds.contains(
+        &super::commerce_cart_service_provider::CommerceCartRuntimeEventKind::PolicyDecision
+    ));
+    assert!(kinds.contains(
+        &super::commerce_cart_service_provider::CommerceCartRuntimeEventKind::HandoffPlanned
+    ));
+    assert!(kinds.contains(
+        &super::commerce_cart_service_provider::CommerceCartRuntimeEventKind::ProviderCallSucceeded
+    ));
+}
