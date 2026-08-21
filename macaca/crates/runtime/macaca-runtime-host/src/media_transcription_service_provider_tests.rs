@@ -82,3 +82,48 @@ async fn preflight_rejections_do_not_complete_provider_work() {
     let event = events.recv().await.unwrap();
     assert_eq!(event.outcome, "preflight_rejected");
 }
+
+#[tokio::test]
+async fn side_effecting_requests_are_idempotent_and_stale_sources_do_not_complete() {
+    let provider = MediaTranscriptionSystemServiceProvider::mock();
+    let mut first = ServiceCommand::with_trace(
+        ServiceCommandName::new("transcription.batch_request"),
+        serde_json::json!({}),
+        TraceContext::new("transcription-first"),
+    );
+    first
+        .metadata
+        .insert("idempotency_key".into(), "request-once".into());
+    let first_ref = provider.call(first).await.unwrap().output["artifact_ref"].clone();
+    let mut replay = ServiceCommand::with_trace(
+        ServiceCommandName::new("transcription.batch_request"),
+        serde_json::json!({}),
+        TraceContext::new("transcription-replay"),
+    );
+    replay
+        .metadata
+        .insert("idempotency_key".into(), "request-once".into());
+    assert_eq!(
+        provider.call(replay).await.unwrap().output["artifact_ref"],
+        first_ref
+    );
+
+    let mut events = provider.subscribe();
+    let mut stale = ServiceCommand::with_trace(
+        ServiceCommandName::new("transcription.batch_request"),
+        serde_json::json!({}),
+        TraceContext::new("transcription-stale"),
+    );
+    stale.metadata.insert("source_version".into(), "v1".into());
+    stale
+        .metadata
+        .insert("current_source_version".into(), "v2".into());
+    assert!(matches!(
+        provider.call(stale).await,
+        Err(ServiceError::AdapterFailure(_))
+    ));
+    assert_eq!(
+        events.recv().await.unwrap().outcome,
+        "precondition_rejected"
+    );
+}

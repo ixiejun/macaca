@@ -118,6 +118,7 @@ pub(crate) mod mcp_operator_lifecycle;
 pub mod mcp_runtime;
 pub mod mcp_service_provider;
 pub mod media_transcription_service_provider;
+mod media_transcription_service_state;
 pub mod memory_service_provider;
 pub mod messaging_service_provider;
 pub mod notification_service_provider;

@@ -5,7 +5,7 @@
 //! exposing transport/provider payloads. Concrete adapters may replace it only
 //! through the runtime-host composition root.
 
-use std::collections::BTreeSet;
+use std::{collections::BTreeSet, sync::Arc};
 
 use async_trait::async_trait;
 use macaca_kernel::SystemService;
@@ -21,6 +21,8 @@ use macaca_proto::{
 };
 use tracing::{info, warn};
 
+use crate::media_transcription_service_state::TranscriptionSideEffectLedger;
+
 /// Bounded event used for audit/replay evidence; source and transcript payloads are absent.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct TranscriptionRuntimeEvent {
@@ -34,6 +36,7 @@ pub struct TranscriptionRuntimeEvent {
 pub struct MediaTranscriptionSystemServiceProvider {
     unavailable_reason: Option<String>,
     events: tokio::sync::broadcast::Sender<TranscriptionRuntimeEvent>,
+    side_effects: Arc<TranscriptionSideEffectLedger>,
 }
 
 impl MediaTranscriptionSystemServiceProvider {
@@ -52,6 +55,7 @@ impl MediaTranscriptionSystemServiceProvider {
         Self {
             unavailable_reason,
             events,
+            side_effects: Arc::new(TranscriptionSideEffectLedger::default()),
         }
     }
 
@@ -141,10 +145,22 @@ impl SystemService for MediaTranscriptionSystemServiceProvider {
             warn!(service_id = MEDIA_TRANSCRIPTION_SERVICE_ID, command = operation, trace_id = %trace.trace_id, rejection = ?rejection, "media transcription command rejected before provider dispatch");
             return Err(preflight_error(rejection));
         }
+        if let Err(error) = TranscriptionSideEffectLedger::validate_source_version(&command) {
+            self.emit(operation, &trace.trace_id, "precondition_rejected");
+            warn!(service_id = MEDIA_TRANSCRIPTION_SERVICE_ID, command = operation, trace_id = %trace.trace_id, "media transcription command rejected due to stale source version");
+            return Err(error);
+        }
+        let artifact_ref = self
+            .side_effects
+            .outcome_ref(
+                &command,
+                format!("artifact:transcription:{}", trace.trace_id),
+            )
+            .await;
         self.emit(operation, &trace.trace_id, "completed");
         info!(service_id = MEDIA_TRANSCRIPTION_SERVICE_ID, command = operation, trace_id = %trace.trace_id, "media transcription command completed");
         Ok(domain_pack_service_result(
-            serde_json::json!({"status":"metadata_only","operation":operation,"artifact_ref":format!("artifact:transcription:{}", trace.trace_id)}),
+            serde_json::json!({"status":"metadata_only","operation":operation,"artifact_ref":artifact_ref}),
             trace,
             "mock",
         ))
@@ -154,6 +170,7 @@ impl SystemService for MediaTranscriptionSystemServiceProvider {
         Ok(())
     }
     async fn cleanup(&self) -> ServiceResult<()> {
+        self.side_effects.clear().await;
         Ok(())
     }
     async fn health(&self) -> ServiceResult<ServiceHealth> {
