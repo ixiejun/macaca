@@ -11,12 +11,12 @@ use std::sync::Arc;
 use macaca_proto::{
     expand_service_capabilities, validate_audio_permission_declarations,
     validate_camera_permission_declarations, validate_filesystem_root_declarations,
-    validate_key_value_namespace_declarations, validate_secret_reference_declarations,
-    validate_session_state_declarations, validate_transcription_permission_declarations,
-    ApplicationAbiDeclaration, ApplicationAbiError, ApplicationCheckpoint, ApplicationExport,
-    ApplicationHostCommandResult, ApplicationHostCommandStatus, ApplicationLifecycleState,
-    DomainPackCatalog, EffectiveServiceCapabilities, InMemoryDomainPackCatalog, PackageDescriptor,
-    PackageRuntimeKind,
+    validate_host_lifecycle_permission_declarations, validate_key_value_namespace_declarations,
+    validate_secret_reference_declarations, validate_session_state_declarations,
+    validate_transcription_permission_declarations, ApplicationAbiDeclaration, ApplicationAbiError,
+    ApplicationCheckpoint, ApplicationExport, ApplicationHostCommandResult,
+    ApplicationHostCommandStatus, ApplicationLifecycleState, DomainPackCatalog,
+    EffectiveServiceCapabilities, InMemoryDomainPackCatalog, PackageDescriptor, PackageRuntimeKind,
 };
 use tracing::{info, warn};
 
@@ -173,6 +173,10 @@ impl ApplicationAbiAdapter for YamlApplicationAbiAdapter {
             })?;
             validate_camera_permission_declarations(service_contract).map_err(|reason| {
                 warn!(application_id = %application_id, reason, "application ABI camera permission admission rejected");
+                ApplicationAbiError::InvalidDeclaration(reason.into())
+            })?;
+            validate_host_lifecycle_permission_declarations(service_contract).map_err(|reason| {
+                warn!(application_id = %application_id, reason, "application ABI host lifecycle permission admission rejected");
                 ApplicationAbiError::InvalidDeclaration(reason.into())
             })?;
         }
@@ -410,6 +414,10 @@ mod media_audio_tests;
 #[cfg(test)]
 #[path = "abi_device_camera_tests.rs"]
 mod device_camera_tests;
+
+#[cfg(test)]
+#[path = "abi_device_host_lifecycle_tests.rs"]
+mod device_host_lifecycle_tests;
 
 #[cfg(test)]
 #[path = "abi_time_tests.rs"]

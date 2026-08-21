@@ -194,6 +194,11 @@ pub use super::device_camera_preflight::{
     CameraPreflightFailure, CameraSessionAction, CameraSessionState,
 };
 pub use super::device_camera_validation::validate_camera_permission_declarations;
+pub use super::device_host_lifecycle_preflight::{
+    admit_host_lifecycle_operation, transition_host_lifecycle_lease, HostLifecycleLeaseAction,
+    HostLifecycleLeaseState, HostLifecyclePreflightFacts, HostLifecyclePreflightFailure,
+};
+pub use super::device_host_lifecycle_validation::validate_host_lifecycle_permission_declarations;
 pub use super::expansion::{
     expand_service_capabilities, DomainPackEffectiveCapabilityProjection,
     EffectiveServiceCapabilities,

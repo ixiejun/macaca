@@ -25,7 +25,7 @@ pub const DEVICE_FOREGROUND_BACKGROUND_HOST_COMMANDS: &[&str] = &[
     "host_lifecycle.inspect_host",
 ];
 
-const HOST_LIFECYCLE_PERMISSION_SCOPES: &[&str] = &[
+pub const HOST_LIFECYCLE_PERMISSION_SCOPES: &[&str] = &[
     "device.host_lifecycle.read",
     "device.host_lifecycle.events",
     "device.host_lifecycle.foreground",

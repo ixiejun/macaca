@@ -24,11 +24,11 @@
 
 ## 4. Service Provider And Lifecycle State Strategy
 
-- [ ] 4.1 Implement the foreground/background host lifecycle service provider contract behind the service runtime; do not construct providers from kernel, SDK, shells, or generic application-framework code.
+- [x] 4.1 Implement the foreground/background host lifecycle service provider contract behind the service runtime; do not construct providers from kernel, SDK, shells, or generic application-framework code.
 - [x] 4.2 Add provider descriptor support for host-native, browser, remote-host, plugin, mock, and unavailable provider classes.
-- [ ] 4.3 Add foreground session and background lease state machines covering requested, active, throttled, suspended, closing, closed, expired, revoked, failed, and unavailable states.
+- [x] 4.3 Add foreground session and background lease state machines covering requested, active, throttled, suspended, closing, closed, expired, revoked, failed, and unavailable states.
 - [x] 4.4 Add mock and unavailable providers for deterministic tests; host-specific adapters must remain optional providers or plugin/remote modules.
-- [ ] 4.5 Add provider conformance tests for state inspection, event subscription, foreground session open/close, background lease request/release, policy inspection, revocation, throttling, suspension, redaction, and unsupported-command reporting.
+- [x] 4.5 Add provider conformance tests for state inspection, event subscription, foreground session open/close, background lease request/release, policy inspection, revocation, throttling, suspension, redaction, and unsupported-command reporting.
 - [ ] 4.6 Add lifecycle, health, snapshot, shutdown, timeout, cancellation, state transition, resource cleanup, and bounded output behavior.
 
 ## 5. SDK, Admission, Examples, And ABI
@@ -36,15 +36,15 @@
 - [x] 5.1 Extend SDK discovery for `pack.device.foreground_background_host.v1` with command schemas, DTO schemas, permission scopes, examples, availability, host state, supported foreground presentations, supported background lease classes, throttling metadata, diagnostics, compatibility, and documentation URL.
 - [ ] 5.2 Extend application admission so required declarations block when unavailable/disabled and optional declarations degrade explicitly with effective capability mementos.
 - [x] 5.3 Add SDK command helper builders that only produce canonical traced service calls and never construct providers or branch on host/platform/service-type names.
-- [ ] 5.4 Add WASM/application ABI exposure for host lifecycle commands using provider-neutral DTO schemas and canonical service-call dispatch.
+- [x] 5.4 Add WASM/application ABI exposure for host lifecycle commands using provider-neutral DTO schemas and canonical service-call dispatch.
 - [x] 5.5 Add generic examples for state inspection, event subscription, foreground session, background lease, policy inspection, revocation, throttling, and unavailable-provider diagnostics.
 
 ## 6. Trace, Audit, Replay, And Boundary Gates
 
 - [ ] 6.1 Emit sanitized `host_lifecycle.pack_declared`, `host_lifecycle.admission_validated`, `host_lifecycle.policy_decision`, `host_lifecycle.state_changed`, `host_lifecycle.foreground_session_opened`, `host_lifecycle.foreground_session_closed`, `host_lifecycle.background_lease_requested`, `host_lifecycle.background_lease_granted`, `host_lifecycle.background_lease_released`, `host_lifecycle.session_or_lease_revoked`, `host_lifecycle.throttle_changed`, `host_lifecycle.command_failed`, `host_lifecycle.unavailable`, and `host_lifecycle.snapshot_recorded` events.
 - [ ] 6.2 Add replay tests proving every command and lifecycle event is trace-addressable through the canonical service path after refresh/restart.
-- [ ] 6.3 Add dependency-boundary gates proving microkernel, SDK, shells, and generic application framework do not import concrete lifecycle providers or host lifecycle APIs.
-- [ ] 6.4 Add no-direct-provider-call gates proving all host lifecycle commands enter through descriptor-owned service registrations and typed service runtime dispatch.
+- [x] 6.3 Add dependency-boundary gates proving microkernel, SDK, shells, and generic application framework do not import concrete lifecycle providers or host lifecycle APIs.
+- [x] 6.4 Add no-direct-provider-call gates proving all host lifecycle commands enter through descriptor-owned service registrations and typed service runtime dispatch.
 - [ ] 6.5 Add redaction tests for provider payloads, host identifiers, presentation metadata, lifecycle logs, credentials, session/lease ids, snapshots, and diagnostics.
 - [ ] 6.6 Run `openspec validate add-pack-device-foreground-background-host --strict`, DTO compatibility tests, lifecycle transition tests, lease/session tests, revocation tests, boundary gates, file-size gates, and audit replay checks before marking implementation tasks complete.
 

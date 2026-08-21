@@ -57,6 +57,7 @@ pub mod context_service_provider;
 pub mod delegated_task_dispatcher;
 pub mod device_camera_service_provider;
 mod device_camera_service_state;
+pub mod device_host_lifecycle_service_provider;
 pub mod diagnostics_service_provider;
 pub mod document_parsing_service_provider;
 mod domain_pack_provider_replacement;
@@ -135,6 +136,8 @@ pub mod payment_service_provider;
 pub use payment_service_provider::payment_service_descriptor;
 #[cfg(test)]
 mod device_camera_service_provider_tests;
+#[cfg(test)]
+mod device_host_lifecycle_service_provider_tests;
 #[cfg(test)]
 mod foundation_config_service_audit_tests;
 #[cfg(test)]
