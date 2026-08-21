@@ -127,3 +127,33 @@ async fn side_effecting_requests_are_idempotent_and_stale_sources_do_not_complet
         "precondition_rejected"
     );
 }
+
+#[tokio::test]
+async fn replay_snapshot_is_bounded_and_every_declared_command_has_trace_evidence() {
+    let provider = MediaTranscriptionSystemServiceProvider::mock();
+    let mut events = provider.subscribe();
+    for command in MEDIA_TRANSCRIPTION_COMMANDS {
+        provider
+            .call(ServiceCommand::with_trace(
+                ServiceCommandName::new(*command),
+                serde_json::json!({"raw_transcript":"must-not-enter-replay"}),
+                TraceContext::new(format!("replay-{command}")),
+            ))
+            .await
+            .unwrap();
+        assert_eq!(
+            events.recv().await.unwrap().replay_ref,
+            format!("replay:transcription:replay-{command}")
+        );
+    }
+    let snapshot = provider.snapshot().await;
+    assert_eq!(snapshot["snapshot_schema"], "media.transcription.replay.v1");
+    assert_eq!(
+        snapshot["command_count"],
+        MEDIA_TRANSCRIPTION_COMMANDS.len().to_string()
+    );
+    assert!(snapshot
+        .values()
+        .all(|value| !value.contains("must-not-enter-replay")));
+    assert_eq!(events.recv().await.unwrap().outcome, "snapshot_recorded");
+}

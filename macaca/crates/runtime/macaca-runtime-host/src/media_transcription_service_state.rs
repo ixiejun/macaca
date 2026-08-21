@@ -59,6 +59,11 @@ impl TranscriptionSideEffectLedger {
     pub async fn clear(&self) {
         self.completions.write().await.clear();
     }
+
+    /// Return the bounded number of cached opaque outcome references.
+    pub async fn completion_count(&self) -> usize {
+        self.completions.read().await.len()
+    }
 }
 
 #[cfg(test)]

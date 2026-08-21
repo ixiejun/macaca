@@ -5,7 +5,10 @@
 //! exposing transport/provider payloads. Concrete adapters may replace it only
 //! through the runtime-host composition root.
 
-use std::{collections::BTreeSet, sync::Arc};
+use std::{
+    collections::{BTreeMap, BTreeSet},
+    sync::Arc,
+};
 
 use async_trait::async_trait;
 use macaca_kernel::SystemService;
@@ -86,6 +89,39 @@ impl MediaTranscriptionSystemServiceProvider {
     /// Subscribe to sanitized events that carry no audio, chunk, or transcript data.
     pub fn subscribe(&self) -> tokio::sync::broadcast::Receiver<TranscriptionRuntimeEvent> {
         self.events.subscribe()
+    }
+
+    /// Return a replay Memento with only descriptor-owned and aggregate facts.
+    ///
+    /// This supports restart diagnostics without preserving source handles,
+    /// audio chunks, transcript content, artifact contents, or provider data.
+    pub async fn snapshot(&self) -> BTreeMap<String, String> {
+        let snapshot = BTreeMap::from([
+            ("provider_class".into(), self.capability().provider_class),
+            (
+                "capability_state".into(),
+                format!("{:?}", self.capability().state),
+            ),
+            (
+                "command_count".into(),
+                MEDIA_TRANSCRIPTION_COMMANDS.len().to_string(),
+            ),
+            (
+                "idempotency_completion_count".into(),
+                self.side_effects.completion_count().await.to_string(),
+            ),
+            (
+                "snapshot_schema".into(),
+                "media.transcription.replay.v1".into(),
+            ),
+        ]);
+        self.emit(
+            "transcription.snapshot",
+            "snapshot:provider",
+            "snapshot_recorded",
+        );
+        info!(service_id = MEDIA_TRANSCRIPTION_SERVICE_ID, completion_count = %snapshot["idempotency_completion_count"], "media transcription provider snapshot recorded");
+        snapshot
     }
 
     fn emit(&self, command: &str, trace_id: &str, outcome: &'static str) {
