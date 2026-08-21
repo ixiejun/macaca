@@ -125,3 +125,39 @@ fn unavailable_provider_capability_report_preserves_sanitized_reason() {
     assert_eq!(report.provider_class, "unavailable");
     assert!(report.trace_id.is_none());
 }
+
+#[test]
+fn session_state_projection_exposes_only_checkpoint_and_replay_mementos() {
+    let snapshot = DomainPackProviderSnapshot {
+        pack_id: "pack.foundation.session.state.v1".into(),
+        service_id: "service.foundation.session_state".into(),
+        provider_class: "embedded-durable".into(),
+        health: "healthy".into(),
+        unavailable_reason: None,
+        trace_id: Some("trace-session-state".into()),
+    };
+    let provider_snapshot = SessionStateProviderSnapshot {
+        descriptor_hash: "descriptor-hash".into(),
+        provider_class: "embedded-durable".into(),
+        revision_hashes: BTreeMap::new(),
+        checkpoint_hashes: BTreeMap::from([("session-hash".into(), "checkpoint-hash".into())]),
+        redaction_summary: SessionStateRedactionSummary {
+            redacted_value_count: 1,
+            redacted_secret_reference_count: 0,
+        },
+    };
+    let projection = DomainPackEffectiveCapabilityProjection {
+        pack_id: snapshot.pack_id,
+        service_id: snapshot.service_id,
+        ..Default::default()
+    }
+    .with_session_state_snapshot(&provider_snapshot);
+    assert_eq!(
+        projection.latest_checkpoint_ref.as_deref(),
+        Some("checkpoint-hash")
+    );
+    assert!(projection.replay_refs.contains("checkpoint-hash"));
+    assert!(!serde_json::to_string(&projection)
+        .unwrap()
+        .contains("session-hash"));
+}

@@ -4,6 +4,7 @@ use std::hash::{Hash, Hasher};
 use serde::{Deserialize, Serialize};
 
 use super::catalog::DomainPackCatalog;
+use super::foundation_session_state::SessionStateProviderSnapshot;
 use super::model::{AppServiceContractConfig, DomainPackDefinition};
 use super::spec::DomainPackDefinitionSpec;
 
@@ -24,6 +25,24 @@ pub struct DomainPackEffectiveCapabilityProjection {
     pub unavailable_features: BTreeMap<String, String>,
     pub provider_capability_flags: BTreeMap<String, BTreeMap<String, String>>,
     pub replay_refs: BTreeSet<String>,
+    /// Runtime memento reference for the latest checkpoint, when a provider
+    /// reports one. The value is opaque and never contains state payloads.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub latest_checkpoint_ref: Option<String>,
+}
+
+impl DomainPackEffectiveCapabilityProjection {
+    /// Enrich a projection with bounded runtime checkpoint/replay facts.
+    ///
+    /// This is deliberately an additive memento operation: manifest expansion
+    /// remains deterministic, while runtime-host may attach a provider snapshot
+    /// after health/capability discovery without constructing a provider here.
+    pub fn with_session_state_snapshot(mut self, snapshot: &SessionStateProviderSnapshot) -> Self {
+        self.latest_checkpoint_ref = snapshot.checkpoint_hashes.values().next_back().cloned();
+        self.replay_refs
+            .extend(snapshot.checkpoint_hashes.values().cloned());
+        self
+    }
 }
 
 /// Result of deterministic capability expansion from manifest declarations plus catalog data.
@@ -315,6 +334,7 @@ fn pack_projections(
                 unavailable_features,
                 provider_capability_flags: provider_flags(pack, service_id),
                 replay_refs: replay_refs(pack),
+                latest_checkpoint_ref: None,
             }
         })
         .collect::<Vec<_>>();

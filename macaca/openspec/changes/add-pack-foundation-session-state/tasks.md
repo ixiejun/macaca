@@ -81,7 +81,7 @@
 - [x] 5.3 Add SDK helpers for get/put, merge patch, checkpoint creation, restore
   dry-run, checkpoint comparison, compaction, clear, recovery inspection, and
   unavailable diagnostics.
-- [ ] 5.4 Extend effective capability projection so applications can inspect
+- [x] 5.4 Extend effective capability projection so applications can inspect
   callable commands, denied commands, unavailable session features, provider
   capability flags, latest checkpoint, and replay references.
 - [x] 5.5 Expose WASM host imports only for declared callable session-state
