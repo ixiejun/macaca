@@ -5,6 +5,7 @@ use serde::{Deserialize, Serialize};
 use super::foundation_filesystem::FilesystemRootRef;
 use super::foundation_key_value_state::KeyValueNamespaceRef;
 use super::foundation_secrets_reference::SecretReference;
+use super::foundation_session_state::SessionStateManifestDeclaration;
 
 /// Optional pack declaration block in an application `service_contract` section.
 /// The raw service lists remain available for low-level capability declarations, while pack
@@ -45,6 +46,13 @@ pub struct AppServiceContractConfig {
     /// Reference-only secret metadata admitted by the secrets-reference pack.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub secret_reference_declarations: Vec<SecretReference>,
+    /// Declarative session-state admission facts for the generic foundation pack.
+    ///
+    /// The declaration carries only bounded session scope and feature intent.
+    /// Runtime-host composition selects providers and enforces side effects; a
+    /// manifest can never embed a persistence connection or provider setting.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub session_state_declarations: Vec<SessionStateManifestDeclaration>,
     /// Mandatory service identifiers required by the application.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub required_services: Vec<String>,

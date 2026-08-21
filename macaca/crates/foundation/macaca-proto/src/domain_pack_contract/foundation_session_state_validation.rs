@@ -1,10 +1,45 @@
 use super::foundation_session_state::{
-    SessionStateCreateCheckpointCommand, SessionStateKeyRef, SessionStateRetentionPolicy,
-    SessionStateSessionRef, SessionStateValueRef,
+    SessionStateCreateCheckpointCommand, SessionStateKeyRef, SessionStateManifestDeclaration,
+    SessionStateRetentionPolicy, SessionStateSessionRef, SessionStateValueRef,
+    FOUNDATION_SESSION_STATE_PACK_ID,
 };
 use super::foundation_validation::{
     bounded_reference, opaque_artifact_reference, secret_store_reference,
 };
+use super::model::AppServiceContractConfig;
+
+/// Validate manifest declarations before ABI projection or provider selection.
+///
+/// Required feature flags are accepted as provider-neutral admission facts;
+/// catalog availability remains checked by the existing required/optional pack
+/// projection. Duplicate session identities and unbounded retention are rejected
+/// before an application obtains a callable service import.
+pub fn validate_session_state_declarations(
+    declaration: &AppServiceContractConfig,
+) -> Result<(), &'static str> {
+    let declared = declaration
+        .use_packs
+        .iter()
+        .chain(declaration.required_packs.iter())
+        .chain(declaration.optional_packs.iter())
+        .any(|pack_id| pack_id == FOUNDATION_SESSION_STATE_PACK_ID);
+    if !declaration.session_state_declarations.is_empty() && !declared {
+        return Err("session-state declarations require the foundation session-state pack");
+    }
+    let mut sessions = std::collections::BTreeSet::new();
+    for session in &declaration.session_state_declarations {
+        if !session.is_admissible() {
+            return Err("session-state declaration is invalid or out of bounds");
+        }
+        if !sessions.insert((
+            &session.session.session_id,
+            session.session.task_id.as_deref(),
+        )) {
+            return Err("session-state declarations must be unique per session scope");
+        }
+    }
+    Ok(())
+}
 
 impl SessionStateSessionRef {
     /// Validate session/task identities as bounded logical references.
@@ -51,6 +86,13 @@ impl SessionStateRetentionPolicy {
             && self.max_checkpoints <= max_checkpoints
             && self.compact_after_revisions > 0
             && self.compact_after_revisions <= max_revisions
+    }
+}
+
+impl SessionStateManifestDeclaration {
+    /// Validate bounded scope and retention without consulting a concrete provider.
+    pub fn is_admissible(&self) -> bool {
+        self.session.is_bounded_reference() && self.retention.is_bounded(31_536_000, 128, 100_000)
     }
 }
 

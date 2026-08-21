@@ -295,14 +295,15 @@ pub use super::foundation_session_state::{
     SessionStateCreateCheckpointCommand, SessionStateDeleteCommand, SessionStateDescriptorHashes,
     SessionStateError, SessionStateExportRedactedCommand, SessionStateGetCommand,
     SessionStateInspectRecoveryCommand, SessionStateKeyRef, SessionStateListCheckpointsCommand,
-    SessionStateListKeysCommand, SessionStateMergePatchCommand, SessionStateProviderCapability,
-    SessionStateProviderSnapshot, SessionStatePutCommand, SessionStateRecoveryMetadata,
-    SessionStateRedactionSummary, SessionStateRestoreCheckpointCommand, SessionStateRestorePlan,
-    SessionStateResultEnvelope, SessionStateResultStatus, SessionStateRetentionPolicy,
-    SessionStateRevision, SessionStateSessionRef, SessionStateValueRef,
-    FOUNDATION_SESSION_STATE_COMMANDS, FOUNDATION_SESSION_STATE_PACK_ID,
-    FOUNDATION_SESSION_STATE_SERVICE_ID,
+    SessionStateListKeysCommand, SessionStateManifestDeclaration, SessionStateMergePatchCommand,
+    SessionStateProviderCapability, SessionStateProviderSnapshot, SessionStatePutCommand,
+    SessionStateRecoveryMetadata, SessionStateRedactionSummary,
+    SessionStateRestoreCheckpointCommand, SessionStateRestorePlan, SessionStateResultEnvelope,
+    SessionStateResultStatus, SessionStateRetentionPolicy, SessionStateRevision,
+    SessionStateSessionRef, SessionStateValueRef, FOUNDATION_SESSION_STATE_COMMANDS,
+    FOUNDATION_SESSION_STATE_PACK_ID, FOUNDATION_SESSION_STATE_SERVICE_ID,
 };
+pub use super::foundation_session_state_validation::validate_session_state_declarations;
 pub use super::foundation_time::{
     foundation_time_descriptor_hashes, foundation_time_pack_definition, time_stable_hash,
     TimeAddDurationCommand, TimeCalendarConvertCommand, TimeCalendarReference,

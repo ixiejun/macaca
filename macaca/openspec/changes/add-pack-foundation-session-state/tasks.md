@@ -39,7 +39,7 @@
 
 ## 3. Admission, Permission, Policy, Resource, And Approval
 
-- [ ] 3.1 Implement manifest declaration validation for required/optional
+- [x] 3.1 Implement manifest declaration validation for required/optional
   `pack.foundation.session.state.v1`, session scopes, checkpoint support, and
   retention policy.
 - [x] 3.2 Validate scopes: `session_state.read`, `session_state.write`,

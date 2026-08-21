@@ -72,6 +72,35 @@ fn foundation_session_state_descriptor_is_discoverable_and_not_callable() {
 }
 
 #[test]
+fn session_state_manifest_declarations_require_pack_and_bounded_retention() {
+    let declaration = SessionStateManifestDeclaration {
+        session: SessionStateSessionRef {
+            session_id: "session-manifest".into(),
+            task_id: Some("task-manifest".into()),
+        },
+        checkpoint_support_required: true,
+        restore_support_required: true,
+        compaction_support_required: false,
+        retention: SessionStateRetentionPolicy {
+            ttl_seconds: Some(60),
+            max_checkpoints: 4,
+            compact_after_revisions: 10,
+        },
+    };
+    let mut contract = AppServiceContractConfig {
+        session_state_declarations: vec![declaration.clone()],
+        ..Default::default()
+    };
+    assert!(validate_session_state_declarations(&contract).is_err());
+    contract
+        .optional_packs
+        .push(FOUNDATION_SESSION_STATE_PACK_ID.into());
+    assert!(validate_session_state_declarations(&contract).is_ok());
+    contract.session_state_declarations.push(declaration);
+    assert!(validate_session_state_declarations(&contract).is_err());
+}
+
+#[test]
 fn industrial_catalog_uses_foundation_session_state_contract_descriptor() {
     let definition = industrial_reference_domain_pack_definitions()
         .into_iter()

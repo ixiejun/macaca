@@ -96,3 +96,24 @@ fn session_state_projection_distinguishes_permission_denial_and_unavailability()
         Some("session_state_provider_not_installed")
     );
 }
+
+#[test]
+fn session_state_manifest_declarations_are_admitted_before_abi_projection() {
+    let accepted = AppLoader::parse_manifest_yaml(
+        "name: session-state-manifest\nlayer: L3Declarative\nservice_contract:\n  required_packs:\n    - pack.foundation.session.state.v1\n  session_state_declarations:\n    - session:\n        session_id: session-declaration\n        task_id: task-declaration\n      checkpoint_support_required: true\n      restore_support_required: true\n      compaction_support_required: true\n      retention:\n        ttl_seconds: 60\n        max_checkpoints: 4\n        compact_after_revisions: 10\n",
+    )
+    .unwrap();
+    assert!(YamlApplicationAbiAdapter::new(accepted)
+        .with_catalog(Arc::new(available_catalog()))
+        .load()
+        .is_ok());
+
+    let undeclared = AppLoader::parse_manifest_yaml(
+        "name: session-state-undeclared\nlayer: L3Declarative\nservice_contract:\n  session_state_declarations:\n    - session:\n        session_id: session-declaration\n        task_id: null\n      checkpoint_support_required: false\n      restore_support_required: false\n      compaction_support_required: false\n      retention:\n        ttl_seconds: null\n        max_checkpoints: 4\n        compact_after_revisions: 10\n",
+    )
+    .unwrap();
+    assert!(YamlApplicationAbiAdapter::new(undeclared)
+        .with_catalog(Arc::new(available_catalog()))
+        .load()
+        .is_err());
+}

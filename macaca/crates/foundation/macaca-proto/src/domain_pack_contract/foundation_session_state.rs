@@ -230,6 +230,20 @@ pub struct SessionStateRetentionPolicy {
     pub compact_after_revisions: u32,
 }
 
+/// Bounded manifest-time declaration for one application session-state scope.
+///
+/// This Value Object defines requested capability facts only. It intentionally
+/// excludes raw state, database configuration, remote store URLs, and provider
+/// handles so the Application Framework can validate admission generically.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct SessionStateManifestDeclaration {
+    pub session: SessionStateSessionRef,
+    pub checkpoint_support_required: bool,
+    pub restore_support_required: bool,
+    pub compaction_support_required: bool,
+    pub retention: SessionStateRetentionPolicy,
+}
+
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct SessionStateRedactionSummary {
     pub redacted_value_count: u32,
