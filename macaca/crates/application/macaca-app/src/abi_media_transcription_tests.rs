@@ -39,3 +39,28 @@ fn transcription_permission_scopes_are_validated_before_abi_projection() {
         .unwrap_err();
     assert!(error.to_string().contains("transcription permission scope"));
 }
+
+#[test]
+fn transcription_abi_projects_declared_commands_and_unavailable_diagnostics() {
+    let manifest = AppLoader::parse_manifest_yaml(
+        "name: transcription-optional\nlayer: L2Wasm\nservice_contract:\n  optional_packs:\n    - pack.media.transcription.v1\n",
+    )
+    .unwrap();
+    let mut unavailable_catalog = InMemoryDomainPackCatalog::new();
+    unavailable_catalog.register(media_transcription_pack_definition());
+    let descriptor = YamlApplicationAbiAdapter::new(manifest)
+        .with_catalog(Arc::new(unavailable_catalog))
+        .load()
+        .unwrap()
+        .descriptor;
+    let projection = descriptor
+        .service_capabilities
+        .capability_projections
+        .iter()
+        .find(|projection| projection.pack_id == "pack.media.transcription.v1")
+        .unwrap();
+
+    assert!(projection
+        .unavailable_commands
+        .contains_key("transcription.batch_request"));
+}
