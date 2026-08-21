@@ -14,9 +14,10 @@ use macaca_proto::media_transcription::{
     MEDIA_TRANSCRIPTION_SERVICE_ID,
 };
 use macaca_proto::{
-    domain_pack_command_trace, domain_pack_service_result, DomainPackProviderCapabilityState,
-    KernelServiceId, ServiceCallResult, ServiceCommand, ServiceDescriptor, ServiceError,
-    ServiceHealth, ServiceResult, ServiceType, TraceSchemaRef,
+    admit_transcription_operation, domain_pack_command_trace, domain_pack_service_result,
+    DomainPackProviderCapabilityState, KernelServiceId, ServiceCallResult, ServiceCommand,
+    ServiceDescriptor, ServiceError, ServiceHealth, ServiceResult, ServiceType, TraceSchemaRef,
+    TranscriptionPreflightFacts, TranscriptionPreflightFailure,
 };
 use tracing::{info, warn};
 
@@ -134,6 +135,12 @@ impl SystemService for MediaTranscriptionSystemServiceProvider {
             warn!(service_id = MEDIA_TRANSCRIPTION_SERVICE_ID, command = operation, trace_id = %trace.trace_id, reason_code = %reason, "media transcription provider unavailable");
             return Err(ServiceError::ServiceUnavailable(reason.clone()));
         }
+        if let Err(rejection) = admit_transcription_operation(operation, preflight_facts(&command))
+        {
+            self.emit(operation, &trace.trace_id, "preflight_rejected");
+            warn!(service_id = MEDIA_TRANSCRIPTION_SERVICE_ID, command = operation, trace_id = %trace.trace_id, rejection = ?rejection, "media transcription command rejected before provider dispatch");
+            return Err(preflight_error(rejection));
+        }
         self.emit(operation, &trace.trace_id, "completed");
         info!(service_id = MEDIA_TRANSCRIPTION_SERVICE_ID, command = operation, trace_id = %trace.trace_id, "media transcription command completed");
         Ok(domain_pack_service_result(
@@ -158,5 +165,47 @@ impl SystemService for MediaTranscriptionSystemServiceProvider {
                     reason: reason.clone(),
                 }
             }))
+    }
+}
+
+/// Read only bounded host-issued admission facts. Raw audio and transcript
+/// payloads are intentionally unavailable to the preflight evaluation.
+fn preflight_facts(command: &ServiceCommand) -> TranscriptionPreflightFacts {
+    let enabled = |key: &str, default: bool| {
+        command
+            .metadata
+            .get(key)
+            .map_or(default, |value| value == "true")
+    };
+    TranscriptionPreflightFacts {
+        permission_granted: enabled("permission_granted", true),
+        provider_available: enabled("provider_available", true),
+        source_consent_granted: enabled("source_consent_granted", true),
+        approval_granted: enabled("approval_granted", true),
+        sensitive_source: enabled("sensitive_source", false),
+        requested_units: command
+            .metadata
+            .get("requested_units")
+            .and_then(|value| value.parse().ok())
+            .unwrap_or(1),
+        reserved_units: command
+            .metadata
+            .get("reserved_units")
+            .and_then(|value| value.parse().ok())
+            .unwrap_or(1),
+    }
+}
+
+fn preflight_error(rejection: TranscriptionPreflightFailure) -> ServiceError {
+    match rejection {
+        TranscriptionPreflightFailure::Denied | TranscriptionPreflightFailure::ApprovalRequired => {
+            ServiceError::DisabledByPolicy(format!("transcription_{rejection:?}").to_lowercase())
+        }
+        TranscriptionPreflightFailure::Unavailable => {
+            ServiceError::ServiceUnavailable("transcription_provider_unavailable".into())
+        }
+        TranscriptionPreflightFailure::QuotaExceeded => {
+            ServiceError::AdapterFailure("transcription_quota_exceeded".into())
+        }
     }
 }

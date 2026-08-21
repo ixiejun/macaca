@@ -64,3 +64,21 @@ async fn unknown_command_is_structured_unsupported() {
         .unwrap_err();
     assert!(matches!(error, ServiceError::UnsupportedCommand(_)));
 }
+
+#[tokio::test]
+async fn preflight_rejections_do_not_complete_provider_work() {
+    let provider = MediaTranscriptionSystemServiceProvider::mock();
+    let mut events = provider.subscribe();
+    let mut command = ServiceCommand::with_trace(
+        ServiceCommandName::new("transcription.batch_request"),
+        serde_json::json!({"raw_audio":"must-not-process"}),
+        TraceContext::new("transcription-preflight"),
+    );
+    command
+        .metadata
+        .insert("permission_granted".into(), "false".into());
+    let error = provider.call(command).await.unwrap_err();
+    assert!(matches!(error, ServiceError::DisabledByPolicy(_)));
+    let event = events.recv().await.unwrap();
+    assert_eq!(event.outcome, "preflight_rejected");
+}

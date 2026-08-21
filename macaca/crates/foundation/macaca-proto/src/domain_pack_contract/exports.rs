@@ -435,6 +435,9 @@ pub use super::knowledge_summarization_preflight::{
     SummarizationAdmissionEvidence, SummarizationDispatchPreflight,
 };
 pub use super::media_common::{MediaCommandEnvelope, MediaError, MediaPage};
+pub use super::media_transcription_preflight::{
+    admit_transcription_operation, TranscriptionPreflightFacts, TranscriptionPreflightFailure,
+};
 pub use super::media_transcription_semantics::{
     transition_transcription_job, transition_transcription_stream, TranscriptionJobAction,
     TranscriptionJobState, TranscriptionStreamAction, TranscriptionStreamState,
