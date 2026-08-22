@@ -321,6 +321,7 @@ pub use super::identity_organization_semantics::{
     OrganizationMutationDecision, OrganizationMutationDiagnosticV1, OrganizationMutationEvidenceV1,
     OrganizationMutationSpec, OrganizationRoleBindingLifecycle,
 };
+pub use super::identity_profile_validation_permissions::validate_identity_profile_permission_declarations;
 pub use super::identity_tenant_semantics::{
     filtered_tenant_page, TenantLifecycle, TenantLifecycleSpec, TenantMutationDecision,
     TenantMutationDiagnosticV1, TenantMutationEvidenceV1, TenantMutationSpec,

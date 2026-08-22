@@ -45,16 +45,16 @@
 ## 5. Service Provider, Provider Strategy, And Unavailable Behavior
 
 - [x] 5.1 Add the profile service provider interface with descriptor, lifecycle, health, snapshot, shutdown, timeout, cancellation, async export support, and command dispatch.
-- [ ] 5.2 Implement provider Strategy adapters behind the service interface without provider-name routing in OS-layer command logic.
-- [ ] 5.3 Implement a mock provider with synthetic profiles, schemas, privacy classes, metadata namespaces, preferences, avatar references, export artifacts, stale-data states, and configurable capability gaps.
+- [x] 5.2 Implement provider Strategy adapters behind the service interface without provider-name routing in OS-layer command logic.
+- [x] 5.3 Implement a mock provider with synthetic profiles, schemas, privacy classes, metadata namespaces, preferences, avatar references, export artifacts, stale-data states, and configurable capability gaps.
 - [x] 5.4 Implement an unavailable provider that returns explicit unavailable diagnostics for every command without fake success.
-- [ ] 5.5 Normalize provider errors into Macaca result envelopes while preserving sanitized provider class, bounded code, retriable flag, field mask, freshness, version conflict, and replay pointer.
+- [x] 5.5 Normalize provider errors into Macaca result envelopes while preserving sanitized provider class, bounded code, retriable flag, field mask, freshness, version conflict, and replay pointer.
 - [x] 5.6 Add provider capability discovery for schema support, field support, metadata namespace support, preference support, avatar support, export support, versioning, field masks, freshness, limits, attribution, and entitlement.
 
 ## 6. SDK, Admission, Examples, And Developer Documentation
 
 - [x] 6.1 Extend pack catalog and SDK discovery for `pack.identity.profile.v1` with schemas, scopes, examples, availability, health, diagnostics, compatibility, provider class, and docs metadata.
-- [ ] 6.2 Extend application admission so required declarations block on unavailable/denied states and optional declarations degrade explicitly with effective capability mementos.
+- [x] 6.2 Extend application admission so required declarations block on unavailable/denied states and optional declarations degrade explicitly with effective capability mementos.
 - [x] 6.3 Add SDK command helper builders that only construct canonical traced service calls and never construct providers.
 - [x] 6.4 Add generic app-facing examples for reading/searching profiles, planning/updating fields, inspecting privacy, reading/writing profile-owned preferences, updating avatar references, syncing profile state, exporting profile evidence, and handling conflicts.
 - [x] 6.5 Create `docs/developer-packs/identity/profile.md` with purpose, manifest declaration, scopes, commands, DTOs, examples, unavailable diagnostics, provider replacement, trace/audit behavior, redaction, idempotency, version tokens, field minimization, privacy classes, avatar artifact boundaries, and account/auth/organization/tenant/session/secret/media/application-preference boundaries.
@@ -63,7 +63,7 @@
 ## 7. Trace, Audit, Replay, And Redaction
 
 - [x] 7.1 Emit sanitized declaration, admission, provider-inspection, policy, entitlement, approval, resource, service-call, patch-planning, privacy-inspection, avatar-reference-change, export-planning, unavailable, health, snapshot, and result events.
-- [ ] 7.2 Add trace schemas for `profile_pack_declared`, `profile_pack_admission_validated`, `profile_pack_policy_decision`, `profile_pack_provider_inspected`, `profile_pack_service_call_requested`, `profile_pack_service_call_succeeded`, `profile_pack_service_call_failed`, `profile_pack_patch_planned`, `profile_pack_privacy_inspected`, `profile_pack_avatar_reference_changed`, `profile_pack_export_planned`, `profile_pack_unavailable`, and `profile_pack_snapshot_recorded`.
+- [x] 7.2 Add trace schemas for `profile_pack_declared`, `profile_pack_admission_validated`, `profile_pack_policy_decision`, `profile_pack_provider_inspected`, `profile_pack_service_call_requested`, `profile_pack_service_call_succeeded`, `profile_pack_service_call_failed`, `profile_pack_patch_planned`, `profile_pack_privacy_inspected`, `profile_pack_avatar_reference_changed`, `profile_pack_export_planned`, `profile_pack_unavailable`, and `profile_pack_snapshot_recorded`.
 - [x] 7.3 Add replay tests proving every command is trace-addressable through the canonical service runtime path.
 - [x] 7.4 Add snapshot tests proving descriptor, provider health, command availability, schema/field/metadata/preference/avatar/export support, policy-template hash, redaction profile, resource counters, freshness, and replay pointers are retained without raw payload leakage.
 - [x] 7.5 Add redaction tests proving raw credentials, tokens, identity documents, raw provider payloads, unbounded profile exports, raw avatar/photo bytes, private keys, and signatures never enter logs, traces, snapshots, or SDK diagnostics.
@@ -74,8 +74,8 @@
 - [x] 8.1 Add dependency gates proving kernel, SDK, shells, and generic application framework do not import concrete profile providers.
 - [x] 8.2 Add no-direct-provider-call tests proving all callable operations traverse descriptor-owned service registration and typed service commands.
 - [x] 8.3 Add canonical execution-path tests covering read-only, search, patch, privacy inspection, preference read/write, avatar reference update, sync, export, denied, unavailable, unsupported, conflict, quota, stale-data, and redaction paths.
-- [ ] 8.4 Add provider replacement tests for built-in, plugin, remote, mock, and unavailable providers.
-- [ ] 8.5 Add boundary tests proving profile commands do not perform account lifecycle, auth handoff, token exchange, credential storage, MFA execution, organization membership changes, tenant policy changes, media processing, or application-specific preference workflows.
+- [x] 8.4 Add provider replacement tests for built-in, plugin, remote, mock, and unavailable providers.
+- [x] 8.5 Add boundary tests proving profile commands do not perform account lifecycle, auth handoff, token exchange, credential storage, MFA execution, organization membership changes, tenant policy changes, media processing, or application-specific preference workflows.
 - [x] 8.6 Add file-size and module-ownership checks for any new implementation files.
 - [x] 8.7 Run `openspec validate add-pack-identity-profile --strict`.
-- [ ] 8.8 Run targeted cargo checks/tests, dependency-boundary gates, audit replay checks, redaction checks, artifact-boundary checks, and profile/account/auth/organization/tenant/session/media/application-preference boundary checks before marking implementation tasks complete.
+- [x] 8.8 Run targeted cargo checks/tests, dependency-boundary gates, audit replay checks, redaction checks, artifact-boundary checks, and profile/account/auth/organization/tenant/session/media/application-preference boundary checks before marking implementation tasks complete.

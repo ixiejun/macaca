@@ -105,6 +105,7 @@ pub mod identity_account_service_provider;
 pub mod identity_auth_handoff_service_provider;
 pub mod identity_organization_service_provider;
 pub mod identity_profile_service_provider;
+mod identity_profile_strategy;
 pub mod identity_tenant_service_provider;
 pub mod inbox_service_provider;
 pub mod interaction_ledger_store;

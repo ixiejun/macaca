@@ -135,6 +135,20 @@ fn profile_capability_reports_unavailable_provider_class() {
     );
 }
 
+#[test]
+fn profile_provider_strategy_replacement_reports_capability_gaps() {
+    let provider =
+        IdentityProfileSystemServiceProvider::mock_with_commands(["profile.read_profile"]);
+    assert!(provider
+        .capability()
+        .feature_flags
+        .contains("profile.read_profile"));
+    assert!(!provider
+        .capability()
+        .feature_flags
+        .contains("profile.update_profile"));
+}
+
 fn command(name: &str, trace_id: &str) -> ServiceCommand {
     ServiceCommand::with_trace(
         ServiceCommandName::new(name),

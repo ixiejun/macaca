@@ -12,6 +12,23 @@ use super::model::{DomainPackDefinition, DomainPackProviderCapabilityState};
 pub const IDENTITY_PROFILE_PACK_ID: &str = "pack.identity.profile.v1";
 pub const IDENTITY_PROFILE_SERVICE_ID: &str = "service.identity.profile";
 
+/// Stable sanitized trace taxonomy for declaration, admission, calls, and replay.
+pub const IDENTITY_PROFILE_TRACE_EVENTS: &[&str] = &[
+    "profile_pack_declared",
+    "profile_pack_admission_validated",
+    "profile_pack_policy_decision",
+    "profile_pack_provider_inspected",
+    "profile_pack_service_call_requested",
+    "profile_pack_service_call_succeeded",
+    "profile_pack_service_call_failed",
+    "profile_pack_patch_planned",
+    "profile_pack_privacy_inspected",
+    "profile_pack_avatar_reference_changed",
+    "profile_pack_export_planned",
+    "profile_pack_unavailable",
+    "profile_pack_snapshot_recorded",
+];
+
 pub const IDENTITY_PROFILE_COMMANDS: &[&str] = &[
     "profile.inspect_provider",
     "profile.describe_schema",
@@ -31,7 +48,7 @@ pub const IDENTITY_PROFILE_COMMANDS: &[&str] = &[
     "profile.get_artifact_handle",
 ];
 
-const PROFILE_PERMISSION_SCOPES: &[&str] = &[
+pub(crate) const IDENTITY_PROFILE_PERMISSION_SCOPES: &[&str] = &[
     "identity.profile.read",
     "identity.profile.write",
     "identity.profile.preferences",
@@ -102,7 +119,7 @@ pub fn identity_profile_pack_definition() -> DomainPackDefinition {
         sdk_slug: "profile",
         service_id: IDENTITY_PROFILE_SERVICE_ID,
         commands: IDENTITY_PROFILE_COMMANDS,
-        permission_scopes: PROFILE_PERMISSION_SCOPES,
+        permission_scopes: IDENTITY_PROFILE_PERMISSION_SCOPES,
         provider_classes: PROFILE_PROVIDER_CLASSES,
         health_probe: "profile.inspect_provider",
         unavailable_reason: "identity_profile_provider_not_installed",

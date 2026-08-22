@@ -4,21 +4,25 @@
 //! intentionally reference-only: profile fields, avatars, media bytes, and
 //! application preference values never enter runtime state or observer events.
 
-use std::collections::{BTreeMap, BTreeSet};
+use std::collections::BTreeMap;
+use std::sync::Arc;
 
 use async_trait::async_trait;
 use macaca_kernel::SystemService;
 use macaca_proto::domain_pack_contract::identity_profile::{
     ProfileProviderCapability, IDENTITY_PROFILE_COMMANDS, IDENTITY_PROFILE_PACK_ID,
-    IDENTITY_PROFILE_SERVICE_ID,
+    IDENTITY_PROFILE_SERVICE_ID, IDENTITY_PROFILE_TRACE_EVENTS,
 };
 use macaca_proto::{
-    domain_pack_command_trace, domain_pack_service_result, DomainPackProviderCapabilityState,
-    KernelServiceId, ServiceCommand, ServiceDescriptor, ServiceError, ServiceHealth, ServiceResult,
-    ServiceType, TraceSchemaRef,
+    domain_pack_command_trace, domain_pack_service_result, KernelServiceId, ServiceCommand,
+    ServiceDescriptor, ServiceError, ServiceHealth, ServiceResult, ServiceType, TraceSchemaRef,
 };
 use tokio::sync::{broadcast, RwLock};
 use tracing::{info, warn};
+
+use crate::identity_profile_strategy::{
+    ConfiguredIdentityProfileStrategy, IdentityProfileProviderStrategy,
+};
 
 /// Trace-safe profile fact emitted for observers and replay indices.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -55,12 +59,24 @@ pub struct IdentityProfileSystemServiceProvider {
     events: broadcast::Sender<IdentityProfileRuntimeEvent>,
     references: RwLock<BTreeMap<String, String>>,
     unavailable_reason: Option<String>,
+    strategy: Arc<dyn IdentityProfileProviderStrategy>,
 }
 
 impl IdentityProfileSystemServiceProvider {
     /// Create a provider-neutral mock for composition and contract testing.
     pub fn mock() -> Self {
         Self::new(None)
+    }
+
+    /// Create a synthetic provider with explicit command capability gaps.
+    pub fn mock_with_commands<I, S>(commands: I) -> Self
+    where
+        I: IntoIterator<Item = S>,
+        S: Into<String>,
+    {
+        let mut provider = Self::new(None);
+        provider.strategy = Arc::new(ConfiguredIdentityProfileStrategy::with_commands(commands));
+        provider
     }
 
     /// Create an explicit unavailable provider without emitting fake results.
@@ -70,38 +86,24 @@ impl IdentityProfileSystemServiceProvider {
 
     fn new(unavailable_reason: Option<String>) -> Self {
         let (events, _) = broadcast::channel(256);
+        let strategy: Arc<dyn IdentityProfileProviderStrategy> =
+            Arc::new(if unavailable_reason.is_some() {
+                ConfiguredIdentityProfileStrategy::unavailable()
+            } else {
+                ConfiguredIdentityProfileStrategy::mock()
+            });
         Self {
             descriptor: identity_profile_service_descriptor(),
             events,
             references: RwLock::new(BTreeMap::new()),
             unavailable_reason,
+            strategy,
         }
     }
 
     /// Report capability facts from descriptor commands rather than profile vendor data.
     pub fn capability(&self) -> ProfileProviderCapability {
-        ProfileProviderCapability {
-            provider_class: if self.unavailable_reason.is_some() {
-                "unavailable"
-            } else {
-                "mock"
-            }
-            .into(),
-            feature_flags: IDENTITY_PROFILE_COMMANDS
-                .iter()
-                .map(|value| (*value).into())
-                .collect::<BTreeSet<_>>(),
-            supported_value_types: BTreeSet::from(["reference".into(), "hash".into()]),
-            limits: BTreeMap::from([
-                ("max_page_size".into(), 100),
-                ("max_snapshot_items".into(), 100),
-            ]),
-            state: if self.unavailable_reason.is_some() {
-                DomainPackProviderCapabilityState::Unavailable
-            } else {
-                DomainPackProviderCapabilityState::Preview
-            },
-        }
+        self.strategy.capability()
     }
 
     /// Subscribe to redacted profile events without exposing profile content.
@@ -160,21 +162,30 @@ impl SystemService for IdentityProfileSystemServiceProvider {
                 IdentityProfileRuntimeEventKind::Unavailable,
             ));
             warn!(service_id = %self.descriptor.id, trace_id = %trace.trace_id, reason_code = %reason, "identity profile provider unavailable");
-            return Err(ServiceError::ServiceUnavailable(reason.clone()));
+            return Err(normalize_profile_error(ServiceError::ServiceUnavailable(
+                reason.clone(),
+            )));
         }
         if !IDENTITY_PROFILE_COMMANDS.contains(&command.name.as_str()) {
-            return Err(ServiceError::UnsupportedCommand(command.name.to_string()));
+            return Err(normalize_profile_error(ServiceError::UnsupportedCommand(
+                command.name.to_string(),
+            )));
         }
+        self.strategy.validate_command(command.name.as_str())?;
         if let Some(reason) = profile_admission_denial(&command.payload) {
             let _ = self.events.send(event(
                 "profile.policy_decision",
                 &trace.trace_id,
                 IdentityProfileRuntimeEventKind::PolicyDecision,
             ));
-            return Err(ServiceError::DisabledByPolicy(reason.into()));
+            return Err(normalize_profile_error(ServiceError::DisabledByPolicy(
+                reason.into(),
+            )));
         }
         if self.references.read().await.len() >= 100 {
-            return Err(ServiceError::DisabledByPolicy("quota_exceeded".into()));
+            return Err(normalize_profile_error(ServiceError::DisabledByPolicy(
+                "quota_exceeded".into(),
+            )));
         }
         let reference = format!("profile:reference:{}", trace.trace_id);
         self.references
@@ -257,6 +268,10 @@ pub fn identity_profile_service_descriptor() -> ServiceDescriptor {
         "command_count".into(),
         IDENTITY_PROFILE_COMMANDS.len().to_string(),
     );
+    descriptor.metadata.insert(
+        "trace_event_count".into(),
+        IDENTITY_PROFILE_TRACE_EVENTS.len().to_string(),
+    );
     descriptor
 }
 
@@ -296,5 +311,30 @@ fn event(
         trace_id: trace_id.into(),
         kind,
         replay_ref: format!("replay:{trace_id}"),
+    }
+}
+
+/// Preserve only bounded provider-neutral error classes at the service edge.
+fn normalize_profile_error(error: ServiceError) -> ServiceError {
+    match error {
+        ServiceError::ServiceUnavailable(_) => {
+            ServiceError::ServiceUnavailable("profile_provider_unavailable".into())
+        }
+        ServiceError::UnsupportedCommand(_) => {
+            ServiceError::UnsupportedCommand("profile_command_unsupported".into())
+        }
+        ServiceError::DisabledByPolicy(reason) => {
+            let bounded = reason
+                .chars()
+                .filter(|character| character.is_ascii_alphanumeric() || *character == '_')
+                .take(64)
+                .collect::<String>();
+            ServiceError::DisabledByPolicy(if bounded.is_empty() {
+                "profile_policy_denied".into()
+            } else {
+                bounded
+            })
+        }
+        other => other,
     }
 }

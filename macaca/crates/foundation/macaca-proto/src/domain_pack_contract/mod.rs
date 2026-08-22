@@ -122,6 +122,7 @@ pub mod identity_organization;
 pub mod identity_organization_semantics;
 pub mod identity_profile;
 mod identity_profile_validation;
+mod identity_profile_validation_permissions;
 pub mod identity_tenant;
 pub mod identity_tenant_semantics;
 mod identity_validation;
