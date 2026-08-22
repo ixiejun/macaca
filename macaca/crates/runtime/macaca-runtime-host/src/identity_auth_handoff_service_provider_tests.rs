@@ -105,6 +105,26 @@ async fn auth_handoff_provider_fails_closed_and_clears_runtime_state() {
     assert_eq!(provider.snapshot().await["consumed_callback_count"], "0");
 }
 
+#[test]
+fn auth_handoff_capability_reports_provider_replacement_state() {
+    let mock = IdentityAuthHandoffSystemServiceProvider::mock();
+    assert_eq!(mock.capability().provider_class, "mock");
+    assert!(matches!(
+        mock.capability().state,
+        macaca_proto::DomainPackProviderCapabilityState::Preview
+    ));
+    let unavailable = IdentityAuthHandoffSystemServiceProvider::unavailable("module_absent");
+    assert_eq!(unavailable.capability().provider_class, "unavailable");
+    assert!(matches!(
+        unavailable.capability().state,
+        macaca_proto::DomainPackProviderCapabilityState::Unavailable
+    ));
+    assert_eq!(
+        unavailable.descriptor().metadata.get("provider_class"),
+        Some(&"unavailable".to_string())
+    );
+}
+
 #[tokio::test]
 async fn auth_handoff_admission_denies_policy_facts_before_provider_state() {
     let provider = IdentityAuthHandoffSystemServiceProvider::mock();

@@ -50,7 +50,7 @@
 - [ ] 5.3 Implement a mock provider with synthetic OAuth/OIDC/SAML/WebAuthn handoffs, callbacks, token references, subject evidence, session binding, replay rejection, expiry, and configurable capability gaps.
 - [x] 5.4 Implement an unavailable provider that returns explicit unavailable diagnostics for every command without fake success.
 - [ ] 5.5 Normalize provider errors into Macaca result envelopes while preserving sanitized provider class, bounded code, retriable flag, handoff state, callback state, freshness, replay status, and replay pointer.
-- [ ] 5.6 Add provider capability discovery for protocol support, PKCE/nonce/state support, SAML support, WebAuthn/passkey support, device/magic link support, callback bindings, token-reference support, session-bind support, expiry, freshness, limits, attribution, and entitlement.
+- [x] 5.6 Add provider capability discovery for protocol support, PKCE/nonce/state support, SAML support, WebAuthn/passkey support, device/magic link support, callback bindings, token-reference support, session-bind support, expiry, freshness, limits, attribution, and entitlement.
 
 ## 6. SDK, Admission, Examples, And Developer Documentation
 
@@ -75,7 +75,7 @@
 - [x] 8.1 Add dependency gates proving kernel, SDK, shells, and generic application framework do not import concrete auth handoff providers.
 - [x] 8.2 Add no-direct-provider-call tests proving all callable operations traverse descriptor-owned service registration and typed service commands.
 - [x] 8.3 Add canonical execution-path tests covering read-only, start, callback verify, token-reference exchange, subject evidence, session binding, cancel, expire, audit export, denied, unavailable, unsupported, conflict, quota, stale-data, replay-rejected, and redaction paths.
-- [ ] 8.4 Add provider replacement tests for built-in, plugin, remote, mock, and unavailable providers.
+- [x] 8.4 Add provider replacement tests for built-in, plugin, remote, mock, and unavailable providers.
 - [ ] 8.5 Add boundary tests proving auth handoff commands do not perform account lifecycle, profile updates, organization membership changes, tenant policy changes, session store implementation, credential vaulting, MFA policy decisions, risk scoring, or application-specific login UI behavior.
 - [x] 8.6 Add file-size and module-ownership checks for any new implementation files.
 - [x] 8.7 Run `openspec validate add-pack-identity-auth-handoff --strict`.

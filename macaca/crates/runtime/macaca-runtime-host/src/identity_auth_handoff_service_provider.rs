@@ -85,7 +85,12 @@ impl IdentityAuthHandoffSystemServiceProvider {
     /// Report protocol support as generic contract facts, not vendor routing.
     pub fn capability(&self) -> AuthHandoffProviderCapability {
         AuthHandoffProviderCapability {
-            provider_class: "mock".into(),
+            provider_class: if self.unavailable_reason.is_some() {
+                "unavailable"
+            } else {
+                "mock"
+            }
+            .into(),
             feature_flags: IDENTITY_AUTH_HANDOFF_COMMANDS
                 .iter()
                 .map(|value| (*value).into())
@@ -100,7 +105,11 @@ impl IdentityAuthHandoffSystemServiceProvider {
                 ("max_pending_handoffs".into(), 100),
                 ("max_snapshot_items".into(), 100),
             ]),
-            state: DomainPackProviderCapabilityState::Preview,
+            state: if self.unavailable_reason.is_some() {
+                DomainPackProviderCapabilityState::Unavailable
+            } else {
+                DomainPackProviderCapabilityState::Preview
+            },
         }
     }
 
@@ -158,7 +167,11 @@ impl IdentityAuthHandoffSystemServiceProvider {
 #[async_trait]
 impl SystemService for IdentityAuthHandoffSystemServiceProvider {
     fn descriptor(&self) -> ServiceDescriptor {
-        self.descriptor.clone()
+        let mut descriptor = self.descriptor.clone();
+        descriptor
+            .metadata
+            .insert("provider_class".into(), self.capability().provider_class);
+        descriptor
     }
     async fn start(&self) -> ServiceResult<()> {
         let _ = self.events.send(event(
