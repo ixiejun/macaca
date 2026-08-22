@@ -176,21 +176,33 @@ impl SystemService for MediaTranscriptionSystemServiceProvider {
         let trace = domain_pack_command_trace(&command)?;
         let operation = command.name.as_str();
         if !MEDIA_TRANSCRIPTION_COMMANDS.contains(&operation) {
-            self.emit(operation, &trace.trace_id, "unsupported");
+            self.emit(
+                "transcription.command_failed",
+                &trace.trace_id,
+                "unsupported",
+            );
             return Err(ServiceError::UnsupportedCommand(operation.into()));
         }
         if let Some(reason) = &self.unavailable_reason {
-            self.emit(operation, &trace.trace_id, "unavailable");
+            self.emit("transcription.unavailable", &trace.trace_id, "unavailable");
             warn!(service_id = MEDIA_TRANSCRIPTION_SERVICE_ID, command = operation, trace_id = %trace.trace_id, reason_code = %reason, "media transcription provider unavailable");
             return Err(ServiceError::ServiceUnavailable(reason.clone()));
         }
         if let Err(rejection) = admit_transcription_operation(operation, self.admission_facts) {
-            self.emit(operation, &trace.trace_id, "preflight_rejected");
+            self.emit(
+                "transcription.policy_decision",
+                &trace.trace_id,
+                "preflight_rejected",
+            );
             warn!(service_id = MEDIA_TRANSCRIPTION_SERVICE_ID, command = operation, trace_id = %trace.trace_id, rejection = ?rejection, "media transcription command rejected before provider dispatch");
             return Err(preflight_error(rejection));
         }
         if let Err(error) = TranscriptionSideEffectLedger::validate_source_version(&command) {
-            self.emit(operation, &trace.trace_id, "precondition_rejected");
+            self.emit(
+                "transcription.command_failed",
+                &trace.trace_id,
+                "precondition_rejected",
+            );
             warn!(service_id = MEDIA_TRANSCRIPTION_SERVICE_ID, command = operation, trace_id = %trace.trace_id, "media transcription command rejected due to stale source version");
             return Err(error);
         }
@@ -201,7 +213,11 @@ impl SystemService for MediaTranscriptionSystemServiceProvider {
                 format!("artifact:transcription:{}", trace.trace_id),
             )
             .await;
-        self.emit(operation, &trace.trace_id, "completed");
+        self.emit(
+            transcription_success_event(operation),
+            &trace.trace_id,
+            "completed",
+        );
         info!(service_id = MEDIA_TRANSCRIPTION_SERVICE_ID, command = operation, trace_id = %trace.trace_id, "media transcription command completed");
         Ok(domain_pack_service_result(
             serde_json::json!({"status":"metadata_only","operation":operation,"artifact_ref":artifact_ref}),
@@ -226,6 +242,38 @@ impl SystemService for MediaTranscriptionSystemServiceProvider {
                     reason: reason.clone(),
                 }
             }))
+    }
+}
+
+/// Map every typed transcription command to a stable, sanitized audit event.
+fn transcription_success_event(operation: &str) -> &'static str {
+    match operation {
+        "transcription.inspect_provider" => "transcription.provider_inspected",
+        "transcription.import_source_request" => "transcription.source_import_requested",
+        "transcription.open_source" => "transcription.source_opened",
+        "transcription.inspect_media" => "transcription.media_inspected",
+        "transcription.plan_batch" => "transcription.batch_planned",
+        "transcription.batch_request" => "transcription.batch_requested",
+        "transcription.plan_stream" => "transcription.stream_planned",
+        "transcription.start_stream" => "transcription.stream_started",
+        "transcription.append_stream_chunk" => "transcription.stream_chunk_appended",
+        "transcription.finish_stream" => "transcription.stream_finished",
+        "transcription.cancel_stream" => "transcription.stream_cancelled",
+        "transcription.plan_diarization" => "transcription.diarization_planned",
+        "transcription.diarization_request" => "transcription.diarization_requested",
+        "transcription.align_timestamps" => "transcription.timestamps_aligned",
+        "transcription.normalize_transcript" => "transcription.transcript_normalized",
+        "transcription.plan_redaction" => "transcription.redaction_planned",
+        "transcription.redaction_request" => "transcription.redaction_requested",
+        "transcription.plan_subtitle_export" => "transcription.subtitle_export_planned",
+        "transcription.subtitle_export_request" => "transcription.subtitle_export_requested",
+        "transcription.plan_translation_handoff" => "transcription.translation_handoff_planned",
+        "transcription.translation_handoff_request" => {
+            "transcription.translation_handoff_requested"
+        }
+        "transcription.inspect_job" => "transcription.job_inspected",
+        "transcription.get_artifact_handle" => "transcription.artifact_handle_created",
+        _ => "transcription.command_completed",
     }
 }
 

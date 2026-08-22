@@ -9,6 +9,93 @@ use macaca_proto::{
 
 use super::media_transcription_service_provider::MediaTranscriptionSystemServiceProvider;
 
+#[test]
+fn every_transcription_command_has_a_specific_audit_event() {
+    let expected = [
+        (
+            "transcription.inspect_provider",
+            "transcription.provider_inspected",
+        ),
+        (
+            "transcription.import_source_request",
+            "transcription.source_import_requested",
+        ),
+        ("transcription.open_source", "transcription.source_opened"),
+        (
+            "transcription.inspect_media",
+            "transcription.media_inspected",
+        ),
+        ("transcription.plan_batch", "transcription.batch_planned"),
+        (
+            "transcription.batch_request",
+            "transcription.batch_requested",
+        ),
+        ("transcription.plan_stream", "transcription.stream_planned"),
+        ("transcription.start_stream", "transcription.stream_started"),
+        (
+            "transcription.append_stream_chunk",
+            "transcription.stream_chunk_appended",
+        ),
+        (
+            "transcription.finish_stream",
+            "transcription.stream_finished",
+        ),
+        (
+            "transcription.cancel_stream",
+            "transcription.stream_cancelled",
+        ),
+        (
+            "transcription.plan_diarization",
+            "transcription.diarization_planned",
+        ),
+        (
+            "transcription.diarization_request",
+            "transcription.diarization_requested",
+        ),
+        (
+            "transcription.align_timestamps",
+            "transcription.timestamps_aligned",
+        ),
+        (
+            "transcription.normalize_transcript",
+            "transcription.transcript_normalized",
+        ),
+        (
+            "transcription.plan_redaction",
+            "transcription.redaction_planned",
+        ),
+        (
+            "transcription.redaction_request",
+            "transcription.redaction_requested",
+        ),
+        (
+            "transcription.plan_subtitle_export",
+            "transcription.subtitle_export_planned",
+        ),
+        (
+            "transcription.subtitle_export_request",
+            "transcription.subtitle_export_requested",
+        ),
+        (
+            "transcription.plan_translation_handoff",
+            "transcription.translation_handoff_planned",
+        ),
+        (
+            "transcription.translation_handoff_request",
+            "transcription.translation_handoff_requested",
+        ),
+        ("transcription.inspect_job", "transcription.job_inspected"),
+        (
+            "transcription.get_artifact_handle",
+            "transcription.artifact_handle_created",
+        ),
+    ];
+    assert_eq!(expected.len(), MEDIA_TRANSCRIPTION_COMMANDS.len());
+    for command in MEDIA_TRANSCRIPTION_COMMANDS {
+        assert!(expected.iter().any(|(known, _)| known == command));
+    }
+}
+
 #[tokio::test]
 async fn declared_transcription_commands_are_traceable_and_redacted() {
     let provider = MediaTranscriptionSystemServiceProvider::mock();
