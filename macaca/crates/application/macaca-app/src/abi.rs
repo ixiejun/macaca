@@ -420,5 +420,13 @@ mod device_camera_tests;
 mod device_host_lifecycle_tests;
 
 #[cfg(test)]
+#[path = "abi_device_notifications_tests.rs"]
+mod device_notifications_tests;
+
+#[cfg(test)]
+#[path = "abi_device_sensors_tests.rs"]
+mod device_sensors_tests;
+
+#[cfg(test)]
 #[path = "abi_time_tests.rs"]
 mod time_tests;

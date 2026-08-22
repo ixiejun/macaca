@@ -34,9 +34,9 @@
 ## 5. SDK, Admission, Examples, And ABI
 
 - [x] 5.1 Extend SDK discovery for `pack.device.notifications.v1` with command schemas, DTO schemas, permission scopes, examples, availability, authorization state, channel/category support, schedule limits, badge support, interaction support, diagnostics, compatibility, and documentation URL.
-- [ ] 5.2 Extend application admission so required declarations block when unavailable/disabled and optional declarations degrade explicitly with effective capability mementos.
+- [x] 5.2 Extend application admission so required declarations block when unavailable/disabled and optional declarations degrade explicitly with effective capability mementos.
 - [x] 5.3 Add SDK command helper builders that only produce canonical traced service calls and never construct providers or branch on host/platform names.
-- [ ] 5.4 Add WASM/application ABI exposure for notification commands using provider-neutral DTO schemas and canonical service-call dispatch.
+- [x] 5.4 Add WASM/application ABI exposure for notification commands using provider-neutral DTO schemas and canonical service-call dispatch.
 - [x] 5.5 Add generic examples for authorization, channel/category registration, post, schedule, cancel, badge, interaction handling, push-support inspection, and unavailable-provider diagnostics.
 
 ## 6. Trace, Audit, Replay, And Boundary Gates
