@@ -191,6 +191,7 @@ pub use super::communication_notification::{
 pub use super::developer_browser_automation_validation_permissions::validate_developer_browser_automation_permission_declarations;
 pub use super::developer_ci_validation_permissions::validate_developer_ci_permission_declarations;
 pub use super::developer_code_validation_permissions::validate_developer_code_permission_declarations;
+pub use super::developer_design_tools_validation_permissions::validate_developer_design_tools_permission_declarations;
 pub use super::device_camera_preflight::{
     admit_camera_operation, transition_camera_session, CameraPreflightFacts,
     CameraPreflightFailure, CameraSessionAction, CameraSessionState,

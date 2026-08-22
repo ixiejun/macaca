@@ -15,7 +15,8 @@ use macaca_proto::{
     validate_commerce_payment_intent_permission_declarations,
     validate_developer_browser_automation_permission_declarations,
     validate_developer_ci_permission_declarations, validate_developer_code_permission_declarations,
-    validate_filesystem_root_declarations, validate_finance_accounting_permission_declarations,
+    validate_developer_design_tools_permission_declarations, validate_filesystem_root_declarations,
+    validate_finance_accounting_permission_declarations,
     validate_host_lifecycle_permission_declarations,
     validate_identity_account_permission_declarations,
     validate_identity_auth_handoff_permission_declarations,
@@ -240,6 +241,7 @@ impl ApplicationAbiAdapter for YamlApplicationAbiAdapter {
                 ApplicationAbiError::InvalidDeclaration(reason.into())
             })?;
             validate_developer_code_permission_declarations(service_contract).map_err(|reason| { warn!(application_id = %application_id, reason, "code permission admission rejected"); ApplicationAbiError::InvalidDeclaration(reason.into()) })?;
+            validate_developer_design_tools_permission_declarations(service_contract).map_err(|reason| { warn!(application_id = %application_id, reason, "design-tools permission admission rejected"); ApplicationAbiError::InvalidDeclaration(reason.into()) })?;
         }
         let service_capabilities =
             expand_service_capabilities(self.manifest.service_contract.as_ref(), catalog);
@@ -480,7 +482,6 @@ mod device_host_lifecycle_tests;
 #[cfg(test)]
 #[path = "abi_device_notifications_tests.rs"]
 mod device_notifications_tests;
-
 #[cfg(test)]
 #[path = "abi_device_sensors_tests.rs"]
 mod device_sensors_tests;
@@ -491,7 +492,6 @@ mod knowledge_graph_tests;
 #[cfg(test)]
 #[path = "abi_device_local_files_tests.rs"]
 mod device_local_files_tests;
-
 #[cfg(test)]
 #[path = "abi_identity_auth_handoff_tests.rs"]
 mod identity_auth_handoff_tests;

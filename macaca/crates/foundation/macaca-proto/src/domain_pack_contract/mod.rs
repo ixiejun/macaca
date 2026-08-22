@@ -62,6 +62,7 @@ pub mod developer_code;
 mod developer_code_validation_permissions;
 pub mod developer_common;
 pub mod developer_design_tools;
+mod developer_design_tools_validation_permissions;
 pub mod developer_issue_tracker;
 pub mod developer_repository;
 pub mod developer_terminal;

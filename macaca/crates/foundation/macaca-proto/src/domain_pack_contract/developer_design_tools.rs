@@ -32,6 +32,32 @@ pub const DEVELOPER_DESIGN_TOOLS_COMMANDS: &[&str] = &[
     "design_tools.get_artifact_handle",
 ];
 
+/// Sanitized event names used for trace and replay without raw design payloads.
+pub const DEVELOPER_DESIGN_TOOLS_TRACE_EVENTS: &[&str] = &[
+    "design_tools_pack_declared",
+    "design_tools_admission_validated",
+    "design_tools_provider_inspected",
+    "design_tools_workspace_listed",
+    "design_tools_file_listed",
+    "design_tools_file_opened",
+    "design_tools_page_inspected",
+    "design_tools_node_inspected",
+    "design_tools_components_inspected",
+    "design_tools_tokens_inspected",
+    "design_tools_token_sync_planned",
+    "design_tools_token_sync_requested",
+    "design_tools_asset_export_planned",
+    "design_tools_asset_export_requested",
+    "design_tools_component_mapped",
+    "design_tools_write_planned",
+    "design_tools_write_requested",
+    "design_tools_reviews_inspected",
+    "design_tools_artifact_handle_issued",
+    "design_tools_policy_decision",
+    "design_tools_unavailable",
+    "design_tools_snapshot_recorded",
+];
+
 const DESIGN_PERMISSION_SCOPES: &[&str] = &[
     "design_tools.provider.inspect",
     "design_tools.workspace.read",
