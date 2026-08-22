@@ -96,6 +96,45 @@ async fn profile_provider_fails_closed_and_releases_bounded_state() {
     );
 }
 
+#[tokio::test]
+async fn profile_admission_denies_policy_facts_before_reference_state() {
+    let provider = IdentityProfileSystemServiceProvider::mock();
+    for (trace, payload) in [
+        ("policy", serde_json::json!({"policy_denied": true})),
+        (
+            "entitlement",
+            serde_json::json!({"entitlement_missing": true}),
+        ),
+        ("privacy", serde_json::json!({"privacy_denied": true})),
+        ("avatar", serde_json::json!({"avatar_denied": true})),
+        ("stale", serde_json::json!({"stale_data": true})),
+    ] {
+        let result = provider
+            .call(ServiceCommand::with_trace(
+                ServiceCommandName::new("profile.plan_patch"),
+                payload,
+                TraceContext::new(trace),
+            ))
+            .await;
+        assert!(matches!(result, Err(ServiceError::DisabledByPolicy(_))));
+    }
+    assert_eq!(provider.snapshot().await["active_reference_count"], "0");
+}
+
+#[test]
+fn profile_capability_reports_unavailable_provider_class() {
+    let provider = IdentityProfileSystemServiceProvider::unavailable("module_absent");
+    assert_eq!(provider.capability().provider_class, "unavailable");
+    assert!(matches!(
+        provider.capability().state,
+        macaca_proto::DomainPackProviderCapabilityState::Unavailable
+    ));
+    assert_eq!(
+        provider.descriptor().metadata.get("provider_class"),
+        Some(&"unavailable".to_string())
+    );
+}
+
 fn command(name: &str, trace_id: &str) -> ServiceCommand {
     ServiceCommand::with_trace(
         ServiceCommandName::new(name),

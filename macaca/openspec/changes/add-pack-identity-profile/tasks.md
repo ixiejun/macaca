@@ -36,11 +36,11 @@
 ## 4. Permission, Policy, Resource, Entitlement, And Approval
 
 - [x] 4.1 Add declaration validation for `identity.profile.read`, `identity.profile.write`, `identity.profile.preferences`, `identity.profile.avatar`, `identity.profile.privacy`, and `identity.profile.export`.
-- [ ] 4.2 Require policy decisions before every command and approval before sensitive field updates, privacy-class changes, retained avatar artifacts, namespace writes that leave the profile boundary, and retained profile exports.
-- [ ] 4.3 Require entitlement checks for provider access, schema support, field support, preference support, avatar support, privacy inspection support, export support, and tenant/provider scope access.
-- [ ] 4.4 Reserve and meter resources for profile search, sync, avatar artifact retrieval, export size, provider quotas, storage, and snapshots.
-- [ ] 4.5 Return typed denied/unavailable/unsupported/conflict/quota/stale-data outcomes before provider calls when preconditions fail.
-- [ ] 4.6 Add tests proving denied, unavailable, unsupported, conflict, quota, stale-data, avatar-artifact, and redaction paths do not call concrete providers when preconditions fail.
+- [x] 4.2 Require policy decisions before every command and approval before sensitive field updates, privacy-class changes, retained avatar artifacts, namespace writes that leave the profile boundary, and retained profile exports.
+- [x] 4.3 Require entitlement checks for provider access, schema support, field support, preference support, avatar support, privacy inspection support, export support, and tenant/provider scope access.
+- [x] 4.4 Reserve and meter resources for profile search, sync, avatar artifact retrieval, export size, provider quotas, storage, and snapshots.
+- [x] 4.5 Return typed denied/unavailable/unsupported/conflict/quota/stale-data outcomes before provider calls when preconditions fail.
+- [x] 4.6 Add tests proving denied, unavailable, unsupported, conflict, quota, stale-data, avatar-artifact, and redaction paths do not call concrete providers when preconditions fail.
 
 ## 5. Service Provider, Provider Strategy, And Unavailable Behavior
 
@@ -49,7 +49,7 @@
 - [ ] 5.3 Implement a mock provider with synthetic profiles, schemas, privacy classes, metadata namespaces, preferences, avatar references, export artifacts, stale-data states, and configurable capability gaps.
 - [x] 5.4 Implement an unavailable provider that returns explicit unavailable diagnostics for every command without fake success.
 - [ ] 5.5 Normalize provider errors into Macaca result envelopes while preserving sanitized provider class, bounded code, retriable flag, field mask, freshness, version conflict, and replay pointer.
-- [ ] 5.6 Add provider capability discovery for schema support, field support, metadata namespace support, preference support, avatar support, export support, versioning, field masks, freshness, limits, attribution, and entitlement.
+- [x] 5.6 Add provider capability discovery for schema support, field support, metadata namespace support, preference support, avatar support, export support, versioning, field masks, freshness, limits, attribution, and entitlement.
 
 ## 6. SDK, Admission, Examples, And Developer Documentation
 
@@ -62,18 +62,18 @@
 
 ## 7. Trace, Audit, Replay, And Redaction
 
-- [ ] 7.1 Emit sanitized declaration, admission, provider-inspection, policy, entitlement, approval, resource, service-call, patch-planning, privacy-inspection, avatar-reference-change, export-planning, unavailable, health, snapshot, and result events.
+- [x] 7.1 Emit sanitized declaration, admission, provider-inspection, policy, entitlement, approval, resource, service-call, patch-planning, privacy-inspection, avatar-reference-change, export-planning, unavailable, health, snapshot, and result events.
 - [ ] 7.2 Add trace schemas for `profile_pack_declared`, `profile_pack_admission_validated`, `profile_pack_policy_decision`, `profile_pack_provider_inspected`, `profile_pack_service_call_requested`, `profile_pack_service_call_succeeded`, `profile_pack_service_call_failed`, `profile_pack_patch_planned`, `profile_pack_privacy_inspected`, `profile_pack_avatar_reference_changed`, `profile_pack_export_planned`, `profile_pack_unavailable`, and `profile_pack_snapshot_recorded`.
 - [x] 7.3 Add replay tests proving every command is trace-addressable through the canonical service runtime path.
-- [ ] 7.4 Add snapshot tests proving descriptor, provider health, command availability, schema/field/metadata/preference/avatar/export support, policy-template hash, redaction profile, resource counters, freshness, and replay pointers are retained without raw payload leakage.
-- [ ] 7.5 Add redaction tests proving raw credentials, tokens, identity documents, raw provider payloads, unbounded profile exports, raw avatar/photo bytes, private keys, and signatures never enter logs, traces, snapshots, or SDK diagnostics.
-- [ ] 7.6 Add artifact-boundary tests proving avatar/photo resources and profile exports are represented as bounded handles, hashes, and redacted metadata in observability surfaces.
+- [x] 7.4 Add snapshot tests proving descriptor, provider health, command availability, schema/field/metadata/preference/avatar/export support, policy-template hash, redaction profile, resource counters, freshness, and replay pointers are retained without raw payload leakage.
+- [x] 7.5 Add redaction tests proving raw credentials, tokens, identity documents, raw provider payloads, unbounded profile exports, raw avatar/photo bytes, private keys, and signatures never enter logs, traces, snapshots, or SDK diagnostics.
+- [x] 7.6 Add artifact-boundary tests proving avatar/photo resources and profile exports are represented as bounded handles, hashes, and redacted metadata in observability surfaces.
 
 ## 8. Boundary, Quality, And Validation Gates
 
 - [x] 8.1 Add dependency gates proving kernel, SDK, shells, and generic application framework do not import concrete profile providers.
 - [x] 8.2 Add no-direct-provider-call tests proving all callable operations traverse descriptor-owned service registration and typed service commands.
-- [ ] 8.3 Add canonical execution-path tests covering read-only, search, patch, privacy inspection, preference read/write, avatar reference update, sync, export, denied, unavailable, unsupported, conflict, quota, stale-data, and redaction paths.
+- [x] 8.3 Add canonical execution-path tests covering read-only, search, patch, privacy inspection, preference read/write, avatar reference update, sync, export, denied, unavailable, unsupported, conflict, quota, stale-data, and redaction paths.
 - [ ] 8.4 Add provider replacement tests for built-in, plugin, remote, mock, and unavailable providers.
 - [ ] 8.5 Add boundary tests proving profile commands do not perform account lifecycle, auth handoff, token exchange, credential storage, MFA execution, organization membership changes, tenant policy changes, media processing, or application-specific preference workflows.
 - [x] 8.6 Add file-size and module-ownership checks for any new implementation files.
