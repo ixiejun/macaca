@@ -42,25 +42,25 @@
 ## 4. Permission, Policy, Resource, Entitlement, And Approval
 
 - [x] 4.1 Add declaration validation for `commerce.entitlement.read`, `commerce.entitlement.grant`, `commerce.entitlement.revoke`, `commerce.entitlement.suspend`, `commerce.entitlement.transfer`, `commerce.entitlement.seat`, `commerce.entitlement.meter`, and `commerce.entitlement.proof_export`.
-- [ ] 4.2 Require policy decisions before every command and approval before manual grants, suspensions, revocations, transfers, seat assignment changes, usage corrections, and retained proof exports.
-- [ ] 4.3 Require entitlement checks for provider access, subject scope, resource scope, source type support, grant support, check support, state transition support, seat support, usage support, proof export support, and merchant/store/channel access.
-- [ ] 4.4 Reserve and meter resources for batch checks, source sync, state transitions, usage recording, proof export size, provider quotas, storage, and snapshots.
-- [ ] 4.5 Return typed denied/unavailable/unsupported/conflict/quota/stale-data outcomes before provider calls when preconditions fail.
-- [ ] 4.6 Add tests proving denied, unavailable, unsupported, conflict, quota, stale-data, source-token-redaction, and proof-redaction paths do not call concrete providers when preconditions fail.
+- [x] 4.2 Require policy decisions before every command and approval before manual grants, suspensions, revocations, transfers, seat assignment changes, usage corrections, and retained proof exports.
+- [x] 4.3 Require entitlement checks for provider access, subject scope, resource scope, source type support, grant support, check support, state transition support, seat support, usage support, proof export support, and merchant/store/channel access.
+- [x] 4.4 Reserve and meter resources for batch checks, source sync, state transitions, usage recording, proof export size, provider quotas, storage, and snapshots.
+- [x] 4.5 Return typed denied/unavailable/unsupported/conflict/quota/stale-data outcomes before provider calls when preconditions fail.
+- [x] 4.6 Add tests proving denied, unavailable, unsupported, conflict, quota, stale-data, source-token-redaction, and proof-redaction paths do not call concrete providers when preconditions fail.
 
 ## 5. Service Provider, Provider Strategy, And Unavailable Behavior
 
-- [ ] 5.1 Add the entitlement service provider interface with descriptor, lifecycle, health, snapshot, shutdown, timeout, cancellation, async sync/export support, and command dispatch.
-- [ ] 5.2 Implement provider Strategy adapters behind the service interface without provider-name routing in OS-layer command logic.
-- [ ] 5.3 Implement a mock provider with synthetic subjects, resources, grants, states, seats, usage balances, source events, proof artifacts, stale-data states, and configurable capability gaps.
+- [x] 5.1 Add the entitlement service provider interface with descriptor, lifecycle, health, snapshot, shutdown, timeout, cancellation, async sync/export support, and command dispatch.
+- [x] 5.2 Implement provider Strategy adapters behind the service interface without provider-name routing in OS-layer command logic.
+- [x] 5.3 Implement a mock provider with synthetic subjects, resources, grants, states, seats, usage balances, source events, proof artifacts, stale-data states, and configurable capability gaps.
 - [x] 5.4 Implement an unavailable provider that returns explicit unavailable diagnostics for every command without fake success.
-- [ ] 5.5 Normalize provider errors into Macaca result envelopes while preserving sanitized provider class, bounded code, retriable flag, entitlement state, source freshness, idempotency hash, and replay pointer.
-- [ ] 5.6 Add provider capability discovery for source types, states, usage dimensions, seat support, transfer support, proof export support, idempotency model, freshness, limits, attribution, and entitlement.
+- [x] 5.5 Normalize provider errors into Macaca result envelopes while preserving sanitized provider class, bounded code, retriable flag, entitlement state, source freshness, idempotency hash, and replay pointer.
+- [x] 5.6 Add provider capability discovery for source types, states, usage dimensions, seat support, transfer support, proof export support, idempotency model, freshness, limits, attribution, and entitlement.
 
 ## 6. SDK, Admission, Examples, And Developer Documentation
 
 - [x] 6.1 Extend pack catalog and SDK discovery for `pack.commerce.entitlement.v1` with schemas, scopes, examples, availability, health, diagnostics, compatibility, provider class, and docs metadata.
-- [ ] 6.2 Extend application admission so required declarations block on unavailable/denied states and optional declarations degrade explicitly with effective capability mementos.
+- [x] 6.2 Extend application admission so required declarations block on unavailable/denied states and optional declarations degrade explicitly with effective capability mementos.
 - [x] 6.3 Add SDK command helper builders that only construct canonical traced service calls and never construct providers.
 - [x] 6.4 Add generic app-facing examples for planning/granting entitlements, checking access, batch checks, syncing sources, suspending/resuming, revoking, transferring, assigning seats, recording usage, reading balances, exporting proof, and handling conflicts.
 - [x] 6.5 Create `docs/developer-packs/commerce/entitlement.md` with purpose, manifest declaration, scopes, commands, DTOs, examples, unavailable diagnostics, provider replacement, trace/audit behavior, redaction, idempotency, source freshness, state semantics, usage/seat semantics, proof export, and payment/refund/invoice/receipt/application-feature boundaries.
@@ -68,20 +68,20 @@
 
 ## 7. Trace, Audit, Replay, And Redaction
 
-- [ ] 7.1 Emit sanitized declaration, admission, provider-inspection, policy, entitlement, approval, resource, service-call, grant-planning, state-transition-planning, usage-recording, proof-export-planning, unavailable, health, snapshot, and result events.
-- [ ] 7.2 Add trace schemas for `entitlement_pack_declared`, `entitlement_pack_admission_validated`, `entitlement_pack_policy_decision`, `entitlement_pack_provider_inspected`, `entitlement_pack_service_call_requested`, `entitlement_pack_service_call_succeeded`, `entitlement_pack_service_call_failed`, `entitlement_pack_grant_planned`, `entitlement_pack_state_transition_planned`, `entitlement_pack_usage_recorded`, `entitlement_pack_proof_export_planned`, `entitlement_pack_unavailable`, and `entitlement_pack_snapshot_recorded`.
-- [ ] 7.3 Add replay tests proving every command is trace-addressable through the canonical service runtime path.
-- [ ] 7.4 Add snapshot tests proving descriptor, provider health, command availability, source/state/usage/seat/transfer/proof support, policy-template hash, redaction profile, resource counters, freshness, and replay pointers are retained without raw payload leakage.
-- [ ] 7.5 Add redaction tests proving raw purchase tokens, app-store signed payloads, payment credentials, provider webhook bodies, license secrets, private keys, raw signatures, raw provider payloads, and unbounded exports never enter logs, traces, snapshots, or SDK diagnostics.
-- [ ] 7.6 Add proof-boundary tests proving proof exports are represented as bounded handles, hashes, and redacted metadata in observability surfaces.
+- [x] 7.1 Emit sanitized declaration, admission, provider-inspection, policy, entitlement, approval, resource, service-call, grant-planning, state-transition-planning, usage-recording, proof-export-planning, unavailable, health, snapshot, and result events.
+- [x] 7.2 Add trace schemas for `entitlement_pack_declared`, `entitlement_pack_admission_validated`, `entitlement_pack_policy_decision`, `entitlement_pack_provider_inspected`, `entitlement_pack_service_call_requested`, `entitlement_pack_service_call_succeeded`, `entitlement_pack_service_call_failed`, `entitlement_pack_grant_planned`, `entitlement_pack_state_transition_planned`, `entitlement_pack_usage_recorded`, `entitlement_pack_proof_export_planned`, `entitlement_pack_unavailable`, and `entitlement_pack_snapshot_recorded`.
+- [x] 7.3 Add replay tests proving every command is trace-addressable through the canonical service runtime path.
+- [x] 7.4 Add snapshot tests proving descriptor, provider health, command availability, source/state/usage/seat/transfer/proof support, policy-template hash, redaction profile, resource counters, freshness, and replay pointers are retained without raw payload leakage.
+- [x] 7.5 Add redaction tests proving raw purchase tokens, app-store signed payloads, payment credentials, provider webhook bodies, license secrets, private keys, raw signatures, raw provider payloads, and unbounded exports never enter logs, traces, snapshots, or SDK diagnostics.
+- [x] 7.6 Add proof-boundary tests proving proof exports are represented as bounded handles, hashes, and redacted metadata in observability surfaces.
 
 ## 8. Boundary, Quality, And Validation Gates
 
-- [ ] 8.1 Add dependency gates proving kernel, SDK, shells, and generic application framework do not import concrete entitlement providers.
+- [x] 8.1 Add dependency gates proving kernel, SDK, shells, and generic application framework do not import concrete entitlement providers.
 - [x] 8.2 Add no-direct-provider-call tests proving all callable operations traverse descriptor-owned service registration and typed service commands.
-- [ ] 8.3 Add canonical execution-path tests covering read-only, grant, check, batch check, source sync, suspend/resume, revoke, transfer, seat assignment, usage, event reference, proof export, denied, unavailable, unsupported, conflict, quota, stale-data, and redaction paths.
-- [ ] 8.4 Add provider replacement tests for built-in, plugin, remote, mock, and unavailable providers.
-- [ ] 8.5 Add boundary tests proving entitlement commands do not execute payments, refunds, invoices, receipts, settlements, pricing changes, checkout flows, or application-specific feature gates.
+- [x] 8.3 Add canonical execution-path tests covering read-only, grant, check, batch check, source sync, suspend/resume, revoke, transfer, seat assignment, usage, event reference, proof export, denied, unavailable, unsupported, conflict, quota, stale-data, and redaction paths.
+- [x] 8.4 Add provider replacement tests for built-in, plugin, remote, mock, and unavailable providers.
+- [x] 8.5 Add boundary tests proving entitlement commands do not execute payments, refunds, invoices, receipts, settlements, pricing changes, checkout flows, or application-specific feature gates.
 - [x] 8.6 Add file-size and module-ownership checks for any new implementation files.
 - [x] 8.7 Run `openspec validate add-pack-commerce-entitlement --strict`.
-- [ ] 8.8 Run targeted cargo checks/tests, dependency-boundary gates, audit replay checks, redaction checks, proof-boundary checks, and entitlement/payment/refund/invoice/receipt/application-feature boundary checks before marking implementation tasks complete.
+- [x] 8.8 Run targeted cargo checks/tests, dependency-boundary gates, audit replay checks, redaction checks, proof-boundary checks, and entitlement/payment/refund/invoice/receipt/application-feature boundary checks before marking implementation tasks complete.
