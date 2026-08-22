@@ -16,11 +16,11 @@
 ## 3. Permission, Policy, Resource, Entitlement, And Approval
 
 - [x] 3.1 Implement declaration validation for `device.camera.read_status`, `device.camera.request_permission`, `device.camera.preview`, `device.camera.capture_photo`, `device.camera.record_video`, `device.camera.read_frame`, `device.camera.controls`, and `device.camera.session.manage`.
-- [ ] 3.2 Enforce authorization, foreground state, privacy indicator, constraints, output intent, media retention, frame rate, duration, size, and redaction policies before dispatch.
+- [x] 3.2 Enforce authorization, foreground state, privacy indicator, constraints, output intent, media retention, frame rate, duration, size, and redaction policies before dispatch.
 - [x] 3.3 Require explicit session constraints, output intents, max duration, resource reservation, cancellation behavior, and revocation behavior.
-- [ ] 3.4 Add resource reservation and quota checks for active sessions, preview streams, recording duration, frame rate, media size, CPU, memory, retained snapshots, and replay metadata.
-- [ ] 3.5 Add approval behavior for camera permission request, recording, frame analysis, remote-host capture, privacy-indicator degradation, and delegated/background capture.
-- [ ] 3.6 Add tests proving denied, unavailable, prompt-not-allowed, foreground-required, session-revoked, privacy-indicator-unavailable, media-too-large, and quota paths do not call concrete providers or leak resources.
+- [x] 3.4 Add resource reservation and quota checks for active sessions, preview streams, recording duration, frame rate, media size, CPU, memory, retained snapshots, and replay metadata.
+- [x] 3.5 Add approval behavior for camera permission request, recording, frame analysis, remote-host capture, privacy-indicator degradation, and delegated/background capture.
+- [x] 3.6 Add tests proving denied, unavailable, prompt-not-allowed, foreground-required, session-revoked, privacy-indicator-unavailable, media-too-large, and quota paths do not call concrete providers or leak resources.
 
 ## 4. Service Provider And Capture Session Strategy
 

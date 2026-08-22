@@ -324,3 +324,43 @@ async fn camera_emits_stable_pack_admission_and_policy_events() {
         );
     }
 }
+
+#[tokio::test]
+async fn camera_preflight_rejects_permission_timeout_cancellation_and_quota_without_resources() {
+    let cases = [
+        CameraPreflightFacts {
+            permission_granted: false,
+            ..CameraPreflightFacts::permissive()
+        },
+        CameraPreflightFacts {
+            within_timeout: false,
+            ..CameraPreflightFacts::permissive()
+        },
+        CameraPreflightFacts {
+            cancellation_requested: true,
+            ..CameraPreflightFacts::permissive()
+        },
+        CameraPreflightFacts {
+            requested_units: 4,
+            reserved_units: 1,
+            ..CameraPreflightFacts::permissive()
+        },
+    ];
+    for (index, facts) in cases.into_iter().enumerate() {
+        let provider = DeviceCameraSystemServiceProvider::mock().with_admission_facts(facts);
+        let mut events = provider.subscribe();
+        assert!(provider
+            .call(ServiceCommand::with_trace(
+                ServiceCommandName::new("camera.start_recording"),
+                serde_json::json!({"raw_frame":"must-not-dispatch"}),
+                TraceContext::new(format!("camera-preflight-{index}")),
+            ))
+            .await
+            .is_err());
+        let rejection = events.recv().await.unwrap();
+        assert_eq!(rejection.command, "camera.policy_decision");
+        let snapshot = provider.snapshot().await;
+        assert_eq!(snapshot["active_session_count"], "0");
+        assert_eq!(snapshot["active_output_count"], "0");
+    }
+}
