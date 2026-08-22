@@ -58,3 +58,31 @@ async fn unavailable_local_files_provider_fails_closed_and_cleanup_releases_coun
     provider.cleanup().await.unwrap();
     assert_eq!(provider.snapshot().await["active_handle_count"], "0");
 }
+
+#[tokio::test]
+async fn local_files_replay_reference_is_stable_after_provider_restart() {
+    let trace_id = "local-files-restart-trace";
+    let first = DeviceLocalFilesSystemServiceProvider::mock();
+    first
+        .call(ServiceCommand::with_trace(
+            ServiceCommandName::new("local_files.inspect_host"),
+            serde_json::json!({"path":"must-not-replay"}),
+            TraceContext::new(trace_id),
+        ))
+        .await
+        .unwrap();
+    first.cleanup().await.unwrap();
+    let restarted = DeviceLocalFilesSystemServiceProvider::mock();
+    let mut events = restarted.subscribe();
+    restarted
+        .call(ServiceCommand::with_trace(
+            ServiceCommandName::new("local_files.inspect_host"),
+            serde_json::json!({"contents":"must-not-replay"}),
+            TraceContext::new(trace_id),
+        ))
+        .await
+        .unwrap();
+    let event = events.recv().await.unwrap();
+    assert_eq!(event.trace_id, trace_id);
+    assert_eq!(event.replay_ref, format!("replay:local-files:{trace_id}"));
+}

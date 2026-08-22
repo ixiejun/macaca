@@ -50,3 +50,31 @@ async fn unavailable_sensor_provider_fails_closed_and_cleanup_releases_state() {
     provider.cleanup().await.unwrap();
     assert_eq!(provider.snapshot().await["active_stream_count"], "0");
 }
+
+#[tokio::test]
+async fn sensor_replay_reference_is_stable_after_provider_restart() {
+    let trace_id = "sensors-restart-trace";
+    let first = DeviceSensorsSystemServiceProvider::mock();
+    first
+        .call(ServiceCommand::with_trace(
+            ServiceCommandName::new("sensors.inspect_host"),
+            serde_json::json!({"sample_vector":"must-not-replay"}),
+            TraceContext::new(trace_id),
+        ))
+        .await
+        .unwrap();
+    first.cleanup().await.unwrap();
+    let restarted = DeviceSensorsSystemServiceProvider::mock();
+    let mut events = restarted.subscribe();
+    restarted
+        .call(ServiceCommand::with_trace(
+            ServiceCommandName::new("sensors.inspect_host"),
+            serde_json::json!({"hardware_id":"must-not-replay"}),
+            TraceContext::new(trace_id),
+        ))
+        .await
+        .unwrap();
+    let event = events.recv().await.unwrap();
+    assert_eq!(event.trace_id, trace_id);
+    assert_eq!(event.replay_ref, format!("replay:sensors:{trace_id}"));
+}
