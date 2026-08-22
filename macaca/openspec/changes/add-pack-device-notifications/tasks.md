@@ -42,7 +42,7 @@
 ## 6. Trace, Audit, Replay, And Boundary Gates
 
 - [ ] 6.1 Emit sanitized `notifications.pack_declared`, `notifications.admission_validated`, `notifications.policy_decision`, `notifications.authorization_requested`, `notifications.authorization_changed`, `notifications.channel_registered`, `notifications.category_registered`, `notifications.notification_posted`, `notifications.notification_scheduled`, `notifications.notification_cancelled`, `notifications.interaction_received`, `notifications.badge_updated`, `notifications.command_failed`, `notifications.unavailable`, and `notifications.snapshot_recorded` events.
-- [ ] 6.2 Add replay tests proving every command and interaction event is trace-addressable through the canonical service path after refresh/restart without raw notification bodies.
+- [x] 6.2 Add replay tests proving every command and interaction event is trace-addressable through the canonical service path after refresh/restart without raw notification bodies.
 - [x] 6.3 Add dependency-boundary gates proving microkernel, SDK, shells, and generic application framework do not import concrete notification providers or host notification APIs.
 - [x] 6.4 Add no-direct-provider-call gates proving all notification commands enter through descriptor-owned service registrations and typed service runtime dispatch.
 - [x] 6.5 Add redaction tests for title/body text, action input, push tokens, provider payloads, credentials, notification history, interaction events, snapshots, and diagnostics.

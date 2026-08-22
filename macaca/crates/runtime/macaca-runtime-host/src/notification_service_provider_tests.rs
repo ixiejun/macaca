@@ -253,6 +253,74 @@ async fn notification_provider_redacts_sensitive_payloads_and_replays_after_rest
 }
 
 #[tokio::test]
+async fn notification_every_command_replays_after_runtime_restart() {
+    let events = Arc::new(InMemoryServiceRuntimeEventSink::new());
+    let runtime = Arc::new(ServiceRuntime::new(ServiceRuntimeConfig {
+        event_sink: Some(events.clone()),
+        ..Default::default()
+    }));
+    let provider = Arc::new(NotificationSystemServiceProvider::mock());
+    let mut observer = provider.subscribe();
+    let service_id = runtime
+        .register_provider(
+            &StaticServiceProviderFactory::new(ServiceProviderInstance::new(
+                provider.descriptor(),
+                provider,
+            )),
+            Default::default(),
+        )
+        .await
+        .unwrap();
+    runtime
+        .start(
+            &service_id,
+            TraceContext::new("trace-notification-replay-start"),
+        )
+        .await
+        .unwrap();
+    runtime
+        .stop(
+            &service_id,
+            TraceContext::new("trace-notification-replay-stop"),
+        )
+        .await
+        .unwrap();
+    runtime
+        .start(
+            &service_id,
+            TraceContext::new("trace-notification-replay-restart"),
+        )
+        .await
+        .unwrap();
+
+    for (index, command) in COMMUNICATION_NOTIFICATION_COMMANDS.iter().enumerate() {
+        let trace_id = format!("trace-notification-replay-{index}");
+        dispatch_notification(
+            &runtime,
+            &service_id,
+            command,
+            &trace_id,
+            serde_json::json!({"body": "redacted"}),
+        )
+        .await;
+        let event = receive_kind(&mut observer, event_kind_for_command(command)).await;
+        assert_eq!(event.command, *command);
+        assert_eq!(event.trace_id, trace_id);
+        assert_eq!(event.replay_ref, format!("replay:{trace_id}"));
+        assert!(event.event_name.starts_with("notifications."));
+    }
+
+    let runtime_events = events.events().unwrap();
+    for (index, _) in COMMUNICATION_NOTIFICATION_COMMANDS.iter().enumerate() {
+        let trace_id = format!("trace-notification-replay-{index}");
+        assert!(runtime_events.iter().any(|event| {
+            event.trace_id.as_deref() == Some(trace_id.as_str())
+                && event.operation == "service_runtime.call.completed"
+        }));
+    }
+}
+
+#[tokio::test]
 async fn notification_action_callback_is_trace_addressable() {
     let provider = NotificationSystemServiceProvider::mock();
     let mut events = provider.subscribe();
