@@ -88,6 +88,8 @@ pub mod executor;
 pub mod factory;
 pub(crate) mod file_service_local;
 pub mod file_service_provider;
+pub mod finance_accounting_service_provider;
+mod finance_accounting_strategy;
 pub mod foundation_config_service_provider;
 pub mod foundation_filesystem_service_provider;
 pub mod foundation_key_value_state_service_provider;
@@ -290,6 +292,7 @@ mod document_parsing_service_provider_tests;
 mod email_service_provider_tests;
 #[cfg(test)]
 mod file_service_provider_tests;
+mod finance_accounting_service_provider_tests;
 #[cfg(test)]
 mod git_service_provider_tests;
 #[cfg(test)]

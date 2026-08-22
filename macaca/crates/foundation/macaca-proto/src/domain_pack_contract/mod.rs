@@ -81,6 +81,7 @@ mod finance_accounting_hashes;
 mod finance_accounting_model;
 mod finance_accounting_preflight;
 mod finance_accounting_reports;
+mod finance_accounting_validation_permissions;
 pub mod finance_common;
 pub mod finance_crypto;
 pub mod finance_invoice;

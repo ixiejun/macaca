@@ -12,6 +12,19 @@ pub use super::finance_accounting_reports::*;
 
 pub const FINANCE_ACCOUNTING_PACK_ID: &str = "pack.finance.accounting.v1";
 pub const FINANCE_ACCOUNTING_SERVICE_ID: &str = "service.finance.accounting";
+pub const FINANCE_ACCOUNTING_TRACE_EVENTS: &[&str] = &[
+    "accounting_pack_declared",
+    "accounting_pack_admission_validated",
+    "accounting_pack_policy_decision",
+    "accounting_pack_provider_inspected",
+    "accounting_pack_service_call_requested",
+    "accounting_pack_service_call_succeeded",
+    "accounting_pack_service_call_failed",
+    "accounting_pack_side_effect_planned",
+    "accounting_pack_side_effect_approved",
+    "accounting_pack_unavailable",
+    "accounting_pack_snapshot_recorded",
+];
 pub const FINANCE_ACCOUNTING_COMMANDS: &[&str] = &[
     "accounting.inspect_provider",
     "accounting.list_entities",
@@ -36,7 +49,7 @@ pub const FINANCE_ACCOUNTING_COMMANDS: &[&str] = &[
     "accounting.get_artifact_handle",
 ];
 
-const ACCOUNTING_PERMISSION_SCOPES: &[&str] = &[
+pub const ACCOUNTING_PERMISSION_SCOPES: &[&str] = &[
     "finance.accounting.read",
     "finance.accounting.write",
     "finance.accounting.reconcile",
