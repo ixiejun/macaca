@@ -189,3 +189,37 @@ async fn lifecycle_results_events_and_snapshots_redact_sensitive_host_data() {
         );
     }
 }
+
+#[tokio::test]
+async fn lifecycle_replay_reference_is_stable_after_provider_restart() {
+    let trace_id = "host-lifecycle-restart-trace";
+    let first = DeviceHostLifecycleSystemServiceProvider::mock();
+    first
+        .call(ServiceCommand::with_trace(
+            ServiceCommandName::new("host_lifecycle.inspect_host"),
+            serde_json::json!({"host_id":"must-not-replay"}),
+            TraceContext::new(trace_id),
+        ))
+        .await
+        .unwrap();
+    first.cleanup().await.unwrap();
+
+    // Recreate the provider to model a host refresh while retaining only the
+    // deterministic trace-derived replay address.
+    let restarted = DeviceHostLifecycleSystemServiceProvider::mock();
+    let mut events = restarted.subscribe();
+    restarted
+        .call(ServiceCommand::with_trace(
+            ServiceCommandName::new("host_lifecycle.inspect_host"),
+            serde_json::json!({"lifecycle_log":"must-not-replay"}),
+            TraceContext::new(trace_id),
+        ))
+        .await
+        .unwrap();
+    let event = events.recv().await.unwrap();
+    assert_eq!(event.trace_id, trace_id);
+    assert_eq!(
+        event.replay_ref,
+        format!("replay:host-lifecycle:{trace_id}")
+    );
+}
