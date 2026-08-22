@@ -39,8 +39,7 @@ pub use super::commerce_catalog::{
     CatalogVariantRequestCommand, PriceBook, PriceContext, COMMERCE_CATALOG_COMMANDS,
     COMMERCE_CATALOG_PACK_ID, COMMERCE_CATALOG_SERVICE_ID, COMMERCE_CATALOG_TRACE_EVENTS,
 };
-pub use super::commerce_catalog_validation_permissions::validate_commerce_catalog_permission_declarations;
-pub use super::commerce_common::{CommercePackCommandEnvelope, CommercePackError, CommercePackPage};
+pub use super::commerce_catalog_validation_permissions::validate_commerce_catalog_permission_declarations; pub use super::commerce_common::{CommercePackCommandEnvelope, CommercePackError, CommercePackPage};
 pub use super::commerce_entitlement::{
     commerce_entitlement_descriptor_hashes, commerce_entitlement_pack_definition,
     entitlement_stable_hash, CommerceEntitlementAssignSeatCommand,
@@ -192,6 +191,7 @@ pub use super::communication_notification::{
     COMMUNICATION_NOTIFICATION_PACK_ID, COMMUNICATION_NOTIFICATION_SERVICE_ID,
 };
 pub use super::developer_browser_automation_validation_permissions::validate_developer_browser_automation_permission_declarations;
+pub use super::developer_ci_validation_permissions::validate_developer_ci_permission_declarations;
 pub use super::device_camera_preflight::{
     admit_camera_operation, transition_camera_session, CameraPreflightFacts,
     CameraPreflightFailure, CameraSessionAction, CameraSessionState,

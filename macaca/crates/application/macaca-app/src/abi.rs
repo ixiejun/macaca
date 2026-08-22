@@ -13,7 +13,8 @@ use macaca_proto::{
     validate_camera_permission_declarations, validate_commerce_catalog_permission_declarations,
     validate_commerce_order_permission_declarations, validate_commerce_payment_intent_permission_declarations,
     validate_developer_browser_automation_permission_declarations,
-    validate_filesystem_root_declarations, validate_finance_accounting_permission_declarations,
+    validate_developer_ci_permission_declarations, validate_filesystem_root_declarations,
+    validate_finance_accounting_permission_declarations,
     validate_host_lifecycle_permission_declarations,
     validate_identity_account_permission_declarations,
     validate_identity_auth_handoff_permission_declarations,
@@ -232,10 +233,8 @@ impl ApplicationAbiAdapter for YamlApplicationAbiAdapter {
                 warn!(application_id = %application_id, reason, "payment intent permission admission rejected");
                 ApplicationAbiError::InvalidDeclaration(reason.into())
             })?;
-            validate_developer_browser_automation_permission_declarations(service_contract).map_err(|reason| {
-                warn!(application_id = %application_id, reason, "browser automation permission admission rejected");
-                ApplicationAbiError::InvalidDeclaration(reason.into())
-            })?;
+            validate_developer_browser_automation_permission_declarations(service_contract).map_err(|reason| { warn!(application_id = %application_id, reason, "browser automation permission admission rejected"); ApplicationAbiError::InvalidDeclaration(reason.into()) })?;
+            validate_developer_ci_permission_declarations(service_contract).map_err(|reason| { warn!(application_id = %application_id, reason, "CI permission admission rejected"); ApplicationAbiError::InvalidDeclaration(reason.into()) })?;
         }
         let service_capabilities =
             expand_service_capabilities(self.manifest.service_contract.as_ref(), catalog);

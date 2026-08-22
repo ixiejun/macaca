@@ -32,6 +32,17 @@ pub const DEVELOPER_CI_COMMANDS: &[&str] = &[
     "ci.inspect_tests",
     "ci.inspect_environment",
 ];
+pub const DEVELOPER_CI_TRACE_EVENTS: &[&str] = &[
+    "ci_pack_declared",
+    "ci_pack_admission_validated",
+    "ci_pack_policy_decision",
+    "ci_pack_provider_inspected",
+    "ci_pack_run_requested",
+    "ci_pack_log_read",
+    "ci_pack_artifact_handle",
+    "ci_pack_unavailable",
+    "ci_pack_snapshot_recorded",
+];
 
 const CI_PERMISSION_SCOPES: &[&str] = &[
     "ci.provider.inspect",

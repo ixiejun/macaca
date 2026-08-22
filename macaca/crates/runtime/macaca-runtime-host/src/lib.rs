@@ -64,6 +64,8 @@ pub mod context_service_provider;
 pub mod delegated_task_dispatcher;
 pub mod developer_browser_automation_service_provider;
 pub mod developer_browser_automation_strategy;
+pub mod developer_ci_service_provider;
+pub mod developer_ci_strategy;
 pub mod device_camera_service_provider;
 mod device_camera_service_state;
 pub mod device_host_lifecycle_service_provider;
@@ -301,6 +303,7 @@ mod commerce_payment_intent_service_provider_tests;
 #[cfg(test)]
 mod config_service_provider_tests;
 mod developer_browser_automation_service_provider_tests;
+mod developer_ci_service_provider_tests;
 #[cfg(test)]
 mod diagnostics_realtime_remote_service_provider_tests;
 #[cfg(test)]
