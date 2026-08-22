@@ -364,3 +364,35 @@ async fn camera_preflight_rejects_permission_timeout_cancellation_and_quota_with
         assert_eq!(snapshot["active_output_count"], "0");
     }
 }
+
+#[tokio::test]
+async fn camera_shutdown_invalidates_media_references_and_keeps_snapshot_bounded() {
+    let provider = DeviceCameraSystemServiceProvider::mock();
+    provider
+        .call(ServiceCommand::with_trace(
+            ServiceCommandName::new("camera.open_session"),
+            serde_json::json!({}),
+            TraceContext::new("camera-lifecycle-session"),
+        ))
+        .await
+        .unwrap();
+    provider
+        .call(ServiceCommand::with_trace(
+            ServiceCommandName::new("camera.read_frame"),
+            serde_json::json!({"raw_frame":"must-not-retain"}),
+            TraceContext::new("camera-lifecycle-frame"),
+        ))
+        .await
+        .unwrap();
+    let active = provider.snapshot().await;
+    assert_eq!(active["active_session_count"], "1");
+    assert!(format!("{active:?}").len() < 256);
+    assert!(matches!(
+        provider.health().await.unwrap(),
+        ServiceHealth::Healthy
+    ));
+    provider.stop().await.unwrap();
+    let released = provider.snapshot().await;
+    assert_eq!(released["active_session_count"], "0");
+    assert_eq!(released["active_output_count"], "0");
+}
