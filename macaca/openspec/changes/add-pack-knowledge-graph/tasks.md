@@ -50,7 +50,7 @@
 
 ## 6. Trace, Audit, Replay, Security, And Gates
 
-- [ ] 6.1 Emit sanitized declaration, admission, policy, entitlement, resource, approval, service-call, mutation, query, traversal, path, import/export, merge, provenance, health, snapshot, unavailable, and failure events.
+- [x] 6.1 Emit sanitized declaration, admission, policy, entitlement, resource, approval, service-call, mutation, query, traversal, path, import/export, merge, provenance, health, snapshot, unavailable, and failure events.
 - [x] 6.2 Ensure traces, audits, snapshots, SDK diagnostics, and examples exclude raw credentials, raw provider payloads, raw private graph values, raw source documents, raw execution plans, raw sensitive queries, unbounded outputs, package bytes, manifests, private keys, and signatures.
 - [x] 6.3 Add replay tests proving every `graph.*` command is trace-addressable through the canonical service path and that snapshots contain enough bounded metadata for recovery diagnostics.
 - [x] 6.4 Add dependency gates proving kernel, SDK, shells, and generic application framework do not import concrete graph providers, query engines, database clients, or provider-specific adapters.

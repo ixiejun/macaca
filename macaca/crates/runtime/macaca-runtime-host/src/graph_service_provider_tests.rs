@@ -57,7 +57,7 @@ async fn graph_commands_are_traceable_replayable_and_redacted_through_runtime() 
             event.trace_id.as_deref() == Some(trace_id.as_str())
                 && event.operation == "service_runtime.call.completed"
         }));
-        let event = provider_events.try_recv().unwrap();
+        let event = receive_event(&mut provider_events, &trace_id, command).await;
         assert_eq!(event.trace_id, trace_id);
         assert_eq!(event.command, *command);
         assert_eq!(event.replay_ref, format!("replay:{trace_id}"));
@@ -91,10 +91,68 @@ async fn graph_provider_fails_closed_and_cleans_bounded_snapshot_state() {
     assert_eq!(provider.snapshot().await["active_reference_count"], "0");
 }
 
+#[tokio::test]
+async fn graph_emits_stable_audit_taxonomy() {
+    let provider = GraphSystemServiceProvider::mock();
+    let mut events = provider.subscribe();
+    provider.start().await.unwrap();
+    provider.health().await.unwrap();
+    for operation in [
+        "graph.upsert_node",
+        "graph.query",
+        "graph.traverse",
+        "graph.find_path",
+        "graph.import_subgraph",
+        "graph.merge_entities",
+        "graph.inspect_provenance",
+    ] {
+        provider.call(command(operation, operation)).await.unwrap();
+    }
+    let mut names = Vec::new();
+    while let Ok(event) = events.try_recv() {
+        names.push(event.event_name);
+    }
+    for expected in [
+        "graph.pack_declared",
+        "graph.health",
+        "graph.admission_validated",
+        "graph.policy_decision",
+        "graph.entitlement_checked",
+        "graph.resource_reserved",
+        "graph.approval_checked",
+        "graph.service_call",
+        "graph.mutation",
+        "graph.query",
+        "graph.traversal",
+        "graph.path",
+        "graph.import_export",
+        "graph.merge",
+        "graph.provenance",
+    ] {
+        assert!(
+            names.iter().any(|name| name == expected),
+            "missing {expected}"
+        );
+    }
+}
+
 fn command(name: &str, trace_id: &str) -> ServiceCommand {
     ServiceCommand::with_trace(
         ServiceCommandName::new(name),
         serde_json::json!({}),
         TraceContext::new(trace_id),
     )
+}
+
+async fn receive_event(
+    events: &mut tokio::sync::broadcast::Receiver<super::graph_service_provider::GraphRuntimeEvent>,
+    trace_id: &str,
+    command: &str,
+) -> super::graph_service_provider::GraphRuntimeEvent {
+    loop {
+        let event = events.recv().await.unwrap();
+        if event.trace_id == trace_id && event.command == command {
+            return event;
+        }
+    }
 }

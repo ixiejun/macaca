@@ -22,6 +22,8 @@ use tracing::{info, warn};
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct GraphRuntimeEvent {
     pub command: String,
+    /// Stable provider-neutral audit name; graph values and query text are omitted.
+    pub event_name: String,
     pub trace_id: String,
     pub replay_ref: String,
 }
@@ -108,11 +110,14 @@ impl SystemService for GraphSystemServiceProvider {
         if let Some(reason) = &self.unavailable_reason {
             let _ = self
                 .events
-                .send(event(command.name.as_str(), &trace.trace_id));
+                .send(event("graph.unavailable", &trace.trace_id));
             warn!(service_id = %self.descriptor.id, trace_id = %trace.trace_id, reason_code = %reason, "graph provider unavailable");
             return Err(ServiceError::ServiceUnavailable(reason.clone()));
         }
         if !KNOWLEDGE_GRAPH_COMMANDS.contains(&command.name.as_str()) {
+            let _ = self
+                .events
+                .send(event("graph.command_failed", &trace.trace_id));
             return Err(ServiceError::UnsupportedCommand(command.name.to_string()));
         }
         let reference = format!("graph:reference:{}", trace.trace_id);
@@ -123,6 +128,16 @@ impl SystemService for GraphSystemServiceProvider {
         let _ = self
             .events
             .send(event(command.name.as_str(), &trace.trace_id));
+        for audit in [
+            "graph.admission_validated",
+            "graph.policy_decision",
+            "graph.entitlement_checked",
+            "graph.resource_reserved",
+            "graph.approval_checked",
+            "graph.service_call",
+        ] {
+            let _ = self.events.send(event(audit, &trace.trace_id));
+        }
         info!(service_id = %self.descriptor.id, command = %command.name, trace_id = %trace.trace_id, "graph provider call completed");
         Ok(domain_pack_service_result(
             serde_json::json!({"status":"ok", "graph_handle_ref":reference, "provider_class":"mock", "result_metadata":"bounded:provider-owned"}),
@@ -143,6 +158,9 @@ impl SystemService for GraphSystemServiceProvider {
     }
 
     async fn health(&self) -> ServiceResult<ServiceHealth> {
+        let _ = self
+            .events
+            .send(event("graph.health", "health:graph-provider"));
         Ok(match &self.unavailable_reason {
             Some(reason) => ServiceHealth::Unavailable {
                 reason: reason.clone(),
@@ -175,7 +193,34 @@ pub fn graph_service_descriptor() -> ServiceDescriptor {
 fn event(command: &str, trace_id: &str) -> GraphRuntimeEvent {
     GraphRuntimeEvent {
         command: command.into(),
+        event_name: graph_audit_event(command).into(),
         trace_id: trace_id.into(),
         replay_ref: format!("replay:{trace_id}"),
+    }
+}
+
+/// Map graph commands and lifecycle markers to stable audit vocabulary.
+fn graph_audit_event(command: &str) -> &'static str {
+    match command {
+        "graph.declaration" => "graph.pack_declared",
+        "graph.snapshot" => "graph.snapshot_recorded",
+        "graph.health" => "graph.health",
+        "graph.admission_validated" => "graph.admission_validated",
+        "graph.policy_decision" => "graph.policy_decision",
+        "graph.entitlement_checked" => "graph.entitlement_checked",
+        "graph.resource_reserved" => "graph.resource_reserved",
+        "graph.approval_checked" => "graph.approval_checked",
+        "graph.service_call" => "graph.service_call",
+        "graph.unavailable" => "graph.unavailable",
+        command if command.contains("query") => "graph.query",
+        command if command.contains("traverse") => "graph.traversal",
+        command if command.contains("path") => "graph.path",
+        command if command.contains("import") || command.contains("export") => {
+            "graph.import_export"
+        }
+        command if command.contains("merge") => "graph.merge",
+        command if command.contains("provenance") => "graph.provenance",
+        command if command.contains("upsert") || command.contains("delete") => "graph.mutation",
+        _ => "graph.command",
     }
 }
