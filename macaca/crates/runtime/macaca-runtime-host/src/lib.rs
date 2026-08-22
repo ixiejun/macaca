@@ -16,6 +16,18 @@ pub mod agent_execution_dispatch;
 pub mod agent_execution_orchestration;
 pub mod agent_execution_ports;
 pub mod agent_execution_service_provider;
+pub mod ai_embedding_service_provider;
+pub mod ai_embedding_strategy;
+pub mod ai_llm_service_provider;
+pub mod ai_llm_strategy;
+pub mod ai_model_evaluation_service_provider;
+pub mod ai_model_evaluation_strategy;
+pub mod ai_rerank_service_provider;
+pub mod ai_rerank_strategy;
+pub mod ai_speech_service_provider;
+pub mod ai_speech_strategy;
+pub mod ai_vision_service_provider;
+pub mod ai_vision_strategy;
 pub mod alert_service_provider;
 pub(crate) mod app_protocol_service_commands;
 pub mod app_protocol_service_provider;
@@ -53,12 +65,10 @@ pub mod commerce_cart_service_provider;
 mod commerce_cart_strategy;
 pub mod commerce_catalog_service_provider;
 pub mod commerce_catalog_strategy;
-pub mod commerce_entitlement_service_provider;
 pub mod commerce_order_service_provider;
 pub mod commerce_order_strategy;
 pub mod commerce_payment_intent_service_provider;
 pub mod commerce_payment_intent_strategy;
-pub mod commerce_receipt_service_provider;
 pub mod composed_agent_execution_backend;
 pub(crate) mod config_service_commands;
 pub mod config_service_provider;
@@ -88,6 +98,8 @@ pub mod document_parsing_service_provider;
 mod domain_pack_provider_replacement;
 pub mod domain_pack_service_provider;
 pub mod domain_pack_simple_provider;
+pub mod pack_adapters;
+pub use pack_adapters::*;
 pub mod driver_service_bootstrap;
 pub mod driver_service_provider;
 pub mod email_service_provider;
@@ -115,55 +127,8 @@ pub mod finance_accounting_service_provider;
 mod finance_accounting_strategy;
 pub mod finance_crypto_service_provider;
 pub mod finance_crypto_strategy;
-pub mod finance_invoice_service_provider;
 pub mod finance_market_data_service_provider;
 pub mod finance_market_data_strategy;
-pub mod finance_portfolio_service_provider;
-pub mod finance_stock_service_provider;
-pub mod location_geocode_service_provider;
-pub mod location_maps_service_provider;
-pub mod location_route_service_provider;
-pub mod media_image_service_provider;
-pub mod media_rendering_service_provider;
-pub mod media_video_service_provider;
-pub mod office_document_service_provider;
-pub mod office_forms_service_provider;
-pub mod office_pdf_service_provider;
-pub mod office_presentation_service_provider;
-pub mod office_spreadsheet_service_provider;
-pub mod commerce_entitlement_strategy;
-pub mod commerce_receipt_strategy;
-pub mod finance_invoice_strategy;
-pub mod finance_portfolio_strategy;
-pub mod finance_stock_strategy;
-pub mod location_geocode_strategy;
-pub mod location_maps_strategy;
-pub mod location_route_strategy;
-pub mod media_image_strategy;
-pub mod media_rendering_strategy;
-pub mod media_video_strategy;
-pub mod office_document_strategy;
-pub mod office_forms_strategy;
-pub mod office_pdf_strategy;
-pub mod office_presentation_strategy;
-pub mod office_spreadsheet_strategy;
-pub use domain_pack_simple_provider::{
-    commerce_entitlement::CommerceEntitlementSystemServiceProvider,
-    commerce_receipt::CommerceReceiptSystemServiceProvider,
-    finance_invoice::FinanceInvoiceSystemServiceProvider,
-    finance_portfolio::FinancePortfolioSystemServiceProvider,
-    finance_stock::FinanceStockSystemServiceProvider,
-    location_geocode::LocationGeocodeSystemServiceProvider,
-    location_maps::LocationMapsSystemServiceProvider,
-    location_route::LocationRouteSystemServiceProvider,
-    media_image::MediaImageSystemServiceProvider,
-    media_rendering::MediaRenderingSystemServiceProvider,
-    media_video::MediaVideoSystemServiceProvider,
-    office_document::OfficeDocumentSystemServiceProvider,
-    office_forms::OfficeFormsSystemServiceProvider, office_pdf::OfficePdfSystemServiceProvider,
-    office_presentation::OfficePresentationSystemServiceProvider,
-    office_spreadsheet::OfficeSpreadsheetSystemServiceProvider,
-};
 pub mod foundation_config_service_provider;
 pub mod foundation_filesystem_service_provider;
 pub mod foundation_key_value_state_service_provider;

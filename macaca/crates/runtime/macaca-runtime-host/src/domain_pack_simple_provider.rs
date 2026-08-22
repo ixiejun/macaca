@@ -66,6 +66,38 @@ macro_rules! define_simple_pack {
             pub fn descriptor() -> ServiceDescriptor { let mut d = ServiceDescriptor::new(KernelServiceId::new($service), ServiceType::new(concat!($kind, ".service")), TraceSchemaRef::new(concat!($kind, ".replay.v1"))); d.metadata.insert("pack_id".into(), $pack.into()); d.metadata.insert("command_count".into(), $commands.len().to_string()); d }
             fn denied(payload: &serde_json::Value) -> Option<&'static str> { ["policy_denied","consent_denied","entitlement_denied","approval_required","resource_denied","unsupported","stale_data","timeout","cancelled"].into_iter().find(|key| payload.get(*key).and_then(serde_json::Value::as_bool) == Some(true)) }
             fn sanitize(value: &str) -> String { value.chars().filter(|c| c.is_ascii_alphanumeric() || *c == '_').take(64).collect() }
+            #[cfg(test)]
+            mod tests {
+                use super::*;
+                use macaca_kernel::SystemService;
+                use macaca_proto::{ServiceCommandName, TraceContext};
+
+                fn command(name: &str, payload: serde_json::Value) -> ServiceCommand {
+                    ServiceCommand::with_trace(
+                        ServiceCommandName::new(name),
+                        payload,
+                        TraceContext::new(concat!($kind, "-provider-test")),
+                    )
+                }
+
+                #[tokio::test]
+                async fn unavailable_is_explicit_and_retains_no_reference() {
+                    let provider = $provider::unavailable("provider unavailable");
+                    let result = provider.call(command($commands[0], serde_json::json!({}))).await;
+                    assert!(matches!(result, Err(ServiceError::ServiceUnavailable(_))));
+                    assert_eq!(provider.snapshot().await["reference_count"], "0");
+                }
+
+                #[tokio::test]
+                async fn policy_denial_precedes_reference_retention() {
+                    let provider = $provider::mock();
+                    let result = provider
+                        .call(command($commands[0], serde_json::json!({"policy_denied": true})))
+                        .await;
+                    assert!(matches!(result, Err(ServiceError::DisabledByPolicy(_))));
+                    assert_eq!(provider.snapshot().await["reference_count"], "0");
+                }
+            }
         }
     };
 }
@@ -213,4 +245,85 @@ define_simple_pack!(
     MEDIA_RENDERING_SERVICE_ID,
     MEDIA_RENDERING_COMMANDS,
     "rendering"
+);
+define_simple_pack!(
+    ai_embedding,
+    AiEmbeddingProviderStrategy,
+    AiEmbeddingSystemServiceProvider,
+    AI_EMBEDDING_PACK_ID,
+    AI_EMBEDDING_SERVICE_ID,
+    AI_EMBEDDING_COMMANDS,
+    "embedding"
+);
+define_simple_pack!(
+    ai_llm,
+    AiLlmProviderStrategy,
+    AiLlmSystemServiceProvider,
+    AI_LLM_PACK_ID,
+    AI_LLM_SERVICE_ID,
+    AI_LLM_COMMANDS,
+    "llm"
+);
+define_simple_pack!(
+    ai_model_evaluation,
+    AiModelEvaluationProviderStrategy,
+    AiModelEvaluationSystemServiceProvider,
+    AI_MODEL_EVALUATION_PACK_ID,
+    AI_MODEL_EVALUATION_SERVICE_ID,
+    AI_MODEL_EVALUATION_COMMANDS,
+    "model_evaluation"
+);
+define_simple_pack!(
+    ai_rerank,
+    AiRerankProviderStrategy,
+    AiRerankSystemServiceProvider,
+    AI_RERANK_PACK_ID,
+    AI_RERANK_SERVICE_ID,
+    AI_RERANK_COMMANDS,
+    "rerank"
+);
+define_simple_pack!(
+    ai_speech,
+    AiSpeechProviderStrategy,
+    AiSpeechSystemServiceProvider,
+    AI_SPEECH_PACK_ID,
+    AI_SPEECH_SERVICE_ID,
+    AI_SPEECH_COMMANDS,
+    "speech"
+);
+define_simple_pack!(
+    ai_vision,
+    AiVisionProviderStrategy,
+    AiVisionSystemServiceProvider,
+    AI_VISION_PACK_ID,
+    AI_VISION_SERVICE_ID,
+    AI_VISION_COMMANDS,
+    "vision"
+);
+define_simple_pack!(
+    workflow_delegation,
+    WorkflowDelegationProviderStrategy,
+    WorkflowDelegationSystemServiceProvider,
+    WORKFLOW_DELEGATION_PACK_ID,
+    WORKFLOW_DELEGATION_SERVICE_ID,
+    WORKFLOW_DELEGATION_COMMANDS,
+    "delegation"
+);
+define_simple_pack!(
+    workflow_recovery,
+    WorkflowRecoveryProviderStrategy,
+    WorkflowRecoverySystemServiceProvider,
+    WORKFLOW_RECOVERY_PACK_ID,
+    WORKFLOW_RECOVERY_SERVICE_ID,
+    WORKFLOW_RECOVERY_COMMANDS,
+    "recovery"
+);
+define_simple_pack!(
+    workflow_schedule,
+    WorkflowScheduleProviderStrategy,
+    WorkflowScheduleSystemServiceProvider,
+    WORKFLOW_SCHEDULE_PACK_ID,
+    WORKFLOW_SCHEDULE_SERVICE_ID,
+    WORKFLOW_SCHEDULE_COMMANDS,
+    "schedule"
 );
