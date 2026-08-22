@@ -235,3 +235,34 @@ async fn camera_results_events_and_snapshots_redact_sensitive_provider_data() {
         );
     }
 }
+
+#[tokio::test]
+async fn camera_replay_reference_is_stable_after_provider_restart() {
+    let trace_id = "camera-restart-trace";
+    let first = DeviceCameraSystemServiceProvider::mock();
+    first
+        .call(ServiceCommand::with_trace(
+            ServiceCommandName::new("camera.inspect_host"),
+            serde_json::json!({"raw_frame":"must-not-replay"}),
+            TraceContext::new(trace_id),
+        ))
+        .await
+        .unwrap();
+    first.cleanup().await.unwrap();
+
+    // Recreating the Strategy models a host refresh while preserving only the
+    // deterministic, trace-derived replay address.
+    let restarted = DeviceCameraSystemServiceProvider::mock();
+    let mut events = restarted.subscribe();
+    restarted
+        .call(ServiceCommand::with_trace(
+            ServiceCommandName::new("camera.inspect_host"),
+            serde_json::json!({"media_bytes":"must-not-replay"}),
+            TraceContext::new(trace_id),
+        ))
+        .await
+        .unwrap();
+    let event = events.recv().await.unwrap();
+    assert_eq!(event.trace_id, trace_id);
+    assert_eq!(event.replay_ref, format!("replay:camera:{trace_id}"));
+}
