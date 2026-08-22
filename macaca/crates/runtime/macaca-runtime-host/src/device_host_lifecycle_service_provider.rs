@@ -184,21 +184,33 @@ impl SystemService for DeviceHostLifecycleSystemServiceProvider {
         let trace = domain_pack_command_trace(&command)?;
         let operation = command.name.as_str();
         if !DEVICE_FOREGROUND_BACKGROUND_HOST_COMMANDS.contains(&operation) {
-            self.emit(operation, &trace.trace_id, "unsupported");
+            self.emit(
+                "host_lifecycle.command_failed",
+                &trace.trace_id,
+                "unsupported",
+            );
             return Err(ServiceError::UnsupportedCommand(operation.into()));
         }
         if let Some(reason) = &self.unavailable_reason {
-            self.emit(operation, &trace.trace_id, "unavailable");
+            self.emit("host_lifecycle.unavailable", &trace.trace_id, "unavailable");
             warn!(service_id = DEVICE_FOREGROUND_BACKGROUND_HOST_SERVICE_ID, command = operation, trace_id = %trace.trace_id, reason_code = %reason, "device host lifecycle provider unavailable");
             return Err(ServiceError::ServiceUnavailable(reason.clone()));
         }
         if let Err(rejection) = admit_host_lifecycle_operation(self.admission_facts) {
-            self.emit(operation, &trace.trace_id, "preflight_rejected");
+            self.emit(
+                "host_lifecycle.policy_decision",
+                &trace.trace_id,
+                "preflight_rejected",
+            );
             warn!(service_id = DEVICE_FOREGROUND_BACKGROUND_HOST_SERVICE_ID, command = operation, trace_id = %trace.trace_id, rejection = ?rejection, "device host lifecycle command rejected before adapter dispatch");
             return Err(preflight_error(rejection));
         }
         self.ledger.record(operation).await;
-        self.emit(operation, &trace.trace_id, "completed");
+        self.emit(
+            host_lifecycle_success_event(operation),
+            &trace.trace_id,
+            "completed",
+        );
         info!(service_id = DEVICE_FOREGROUND_BACKGROUND_HOST_SERVICE_ID, command = operation, trace_id = %trace.trace_id, "device host lifecycle command completed with synthetic reference");
         Ok(domain_pack_service_result(
             serde_json::json!({"status":"reference_only","operation":operation,"lifecycle_ref":format!("host-lifecycle-reference:{}", trace.trace_id)}),
@@ -227,6 +239,22 @@ impl SystemService for DeviceHostLifecycleSystemServiceProvider {
                     reason: reason.clone(),
                 }
             }))
+    }
+}
+
+/// Map each lifecycle command to a stable audit event without exposing payloads.
+fn host_lifecycle_success_event(operation: &str) -> &'static str {
+    match operation {
+        "host_lifecycle.inspect_state" => "host_lifecycle.state_inspected",
+        "host_lifecycle.subscribe_events" => "host_lifecycle.events_subscribed",
+        "host_lifecycle.open_foreground_session" => "host_lifecycle.foreground_session_opened",
+        "host_lifecycle.close_foreground_session" => "host_lifecycle.foreground_session_closed",
+        "host_lifecycle.request_background_lease" => "host_lifecycle.background_lease_requested",
+        "host_lifecycle.release_background_lease" => "host_lifecycle.background_lease_released",
+        "host_lifecycle.inspect_policy" => "host_lifecycle.policy_inspected",
+        "host_lifecycle.revoke" => "host_lifecycle.session_or_lease_revoked",
+        "host_lifecycle.inspect_host" => "host_lifecycle.host_inspected",
+        _ => "host_lifecycle.command_completed",
     }
 }
 

@@ -8,6 +8,55 @@ use macaca_proto::{
     TraceContext,
 };
 
+#[test]
+fn every_lifecycle_command_has_a_specific_audit_event() {
+    let expected = [
+        (
+            "host_lifecycle.inspect_state",
+            "host_lifecycle.state_inspected",
+        ),
+        (
+            "host_lifecycle.subscribe_events",
+            "host_lifecycle.events_subscribed",
+        ),
+        (
+            "host_lifecycle.open_foreground_session",
+            "host_lifecycle.foreground_session_opened",
+        ),
+        (
+            "host_lifecycle.close_foreground_session",
+            "host_lifecycle.foreground_session_closed",
+        ),
+        (
+            "host_lifecycle.request_background_lease",
+            "host_lifecycle.background_lease_requested",
+        ),
+        (
+            "host_lifecycle.release_background_lease",
+            "host_lifecycle.background_lease_released",
+        ),
+        (
+            "host_lifecycle.inspect_policy",
+            "host_lifecycle.policy_inspected",
+        ),
+        (
+            "host_lifecycle.revoke",
+            "host_lifecycle.session_or_lease_revoked",
+        ),
+        (
+            "host_lifecycle.inspect_host",
+            "host_lifecycle.host_inspected",
+        ),
+    ];
+    assert_eq!(
+        expected.len(),
+        DEVICE_FOREGROUND_BACKGROUND_HOST_COMMANDS.len()
+    );
+    for command in DEVICE_FOREGROUND_BACKGROUND_HOST_COMMANDS {
+        assert!(expected.iter().any(|(known, _)| known == command));
+    }
+}
+
 #[tokio::test]
 async fn lifecycle_commands_are_traceable_and_redacted() {
     let provider = DeviceHostLifecycleSystemServiceProvider::mock();
