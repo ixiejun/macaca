@@ -17,7 +17,8 @@ use macaca_proto::{
     validate_developer_ci_permission_declarations, validate_developer_code_permission_declarations,
     validate_developer_design_tools_permission_declarations,
     validate_developer_issue_tracker_permission_declarations,
-    validate_developer_repository_permission_declarations, validate_filesystem_root_declarations,
+    validate_developer_repository_permission_declarations,
+    validate_developer_terminal_permission_declarations, validate_filesystem_root_declarations,
     validate_finance_accounting_permission_declarations,
     validate_host_lifecycle_permission_declarations,
     validate_identity_account_permission_declarations,
@@ -246,6 +247,7 @@ impl ApplicationAbiAdapter for YamlApplicationAbiAdapter {
             validate_developer_design_tools_permission_declarations(service_contract).map_err(|reason| { warn!(application_id = %application_id, reason, "design-tools permission admission rejected"); ApplicationAbiError::InvalidDeclaration(reason.into()) })?;
             validate_developer_issue_tracker_permission_declarations(service_contract).map_err(|reason| { warn!(application_id = %application_id, reason, "issue-tracker permission admission rejected"); ApplicationAbiError::InvalidDeclaration(reason.into()) })?;
             validate_developer_repository_permission_declarations(service_contract).map_err(|reason| { warn!(application_id = %application_id, reason, "repository permission admission rejected"); ApplicationAbiError::InvalidDeclaration(reason.into()) })?;
+            validate_developer_terminal_permission_declarations(service_contract).map_err(|reason| { warn!(application_id = %application_id, reason, "terminal permission admission rejected"); ApplicationAbiError::InvalidDeclaration(reason.into()) })?;
         }
         let service_capabilities =
             expand_service_capabilities(self.manifest.service_contract.as_ref(), catalog);
@@ -464,14 +466,6 @@ mod foundation_key_value_state_tests;
 mod foundation_secrets_reference_tests;
 
 #[cfg(test)]
-#[path = "abi_foundation_session_state_tests.rs"]
-mod foundation_session_state_tests;
-
-#[cfg(test)]
-#[path = "abi_media_transcription_tests.rs"]
-mod media_transcription_tests;
-
-#[cfg(test)]
 #[path = "abi_device_camera_tests.rs"]
 mod device_camera_tests;
 #[cfg(test)]
@@ -487,6 +481,9 @@ mod device_notifications_tests;
 #[path = "abi_device_sensors_tests.rs"]
 mod device_sensors_tests;
 #[cfg(test)]
+#[path = "abi_foundation_session_state_tests.rs"]
+mod foundation_session_state_tests;
+#[cfg(test)]
 #[path = "abi_identity_auth_handoff_tests.rs"]
 mod identity_auth_handoff_tests;
 #[cfg(test)]
@@ -498,3 +495,6 @@ mod knowledge_graph_tests;
 #[cfg(test)]
 #[path = "abi_media_audio_tests.rs"]
 mod media_audio_tests;
+#[cfg(test)]
+#[path = "abi_media_transcription_tests.rs"]
+mod media_transcription_tests;

@@ -68,6 +68,7 @@ mod developer_issue_tracker_validation_permissions;
 pub mod developer_repository;
 mod developer_repository_validation_permissions;
 pub mod developer_terminal;
+mod developer_terminal_validation_permissions;
 pub mod device_camera;
 pub mod device_camera_preflight;
 mod device_camera_validation;

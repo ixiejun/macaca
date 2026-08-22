@@ -193,6 +193,7 @@ pub use super::developer_code_validation_permissions::validate_developer_code_pe
 pub use super::developer_design_tools_validation_permissions::validate_developer_design_tools_permission_declarations;
 pub use super::developer_issue_tracker_validation_permissions::validate_developer_issue_tracker_permission_declarations;
 pub use super::developer_repository_validation_permissions::validate_developer_repository_permission_declarations;
+pub use super::developer_terminal_validation_permissions::validate_developer_terminal_permission_declarations;
 pub use super::device_camera_preflight::{
     admit_camera_operation, transition_camera_session, CameraPreflightFacts,
     CameraPreflightFailure, CameraSessionAction, CameraSessionState,

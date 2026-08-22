@@ -26,6 +26,26 @@ pub const DEVELOPER_TERMINAL_COMMANDS: &[&str] = &[
     "terminal.cleanup_session",
 ];
 
+/// Sanitized lifecycle events for terminal service trace and replay evidence.
+pub const DEVELOPER_TERMINAL_TRACE_EVENTS: &[&str] = &[
+    "terminal_pack_declared",
+    "terminal_admission_validated",
+    "terminal_provider_inspected",
+    "terminal_spawn_planned",
+    "terminal_spawn_requested",
+    "terminal_stream_read",
+    "terminal_stdin_sent",
+    "terminal_resized",
+    "terminal_process_inspected",
+    "terminal_exit_collected",
+    "terminal_cancelled",
+    "terminal_workdir_snapshotted",
+    "terminal_session_cleaned",
+    "terminal_policy_decision",
+    "terminal_unavailable",
+    "terminal_snapshot_recorded",
+];
+
 const TERMINAL_PERMISSION_SCOPES: &[&str] = &[
     "terminal.provider.inspect",
     "terminal.spawn",
