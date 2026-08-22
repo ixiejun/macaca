@@ -7,7 +7,8 @@ use macaca_proto::{
 };
 
 use super::notification_service_provider::{
-    NotificationRuntimeEventKind, NotificationSystemServiceProvider,
+    transition_notification_state, NotificationLifecycleState, NotificationRuntimeEventKind,
+    NotificationSystemServiceProvider,
 };
 use crate::{
     InMemoryServiceRuntimeEventSink, ServiceProviderInstance, ServiceRuntime, ServiceRuntimeConfig,
@@ -117,6 +118,57 @@ async fn notification_provider_reports_unavailable_and_unsupported_without_event
         .await
         .unwrap_err();
     assert!(matches!(error, ServiceError::ServiceUnavailable(_)));
+}
+
+#[tokio::test]
+async fn notification_admission_denies_policy_facts_before_delivery_allocation() {
+    let provider = NotificationSystemServiceProvider::mock();
+    for (trace, payload) in [
+        ("auth", serde_json::json!({"authorization_denied": true})),
+        ("content", serde_json::json!({"content_size_bytes": 65_537})),
+        ("action", serde_json::json!({"action_count": 9})),
+        (
+            "background",
+            serde_json::json!({"background_action_denied": true}),
+        ),
+        ("quiet", serde_json::json!({"quiet_hours": true})),
+        ("schedule", serde_json::json!({"schedule_horizon_days": 31})),
+    ] {
+        let command = if trace == "schedule" {
+            "notification.schedule"
+        } else {
+            "notification.publish"
+        };
+        let result = provider
+            .call(ServiceCommand::with_trace(
+                ServiceCommandName::new(command),
+                payload,
+                TraceContext::new(trace),
+            ))
+            .await;
+        assert!(matches!(result, Err(ServiceError::DisabledByPolicy(_))));
+    }
+    assert_eq!(provider.snapshot().await.active_delivery_count, 0);
+}
+
+#[test]
+fn notification_lifecycle_transitions_fail_closed() {
+    assert_eq!(
+        transition_notification_state(NotificationLifecycleState::Requested, "authorize"),
+        Some(NotificationLifecycleState::Authorized)
+    );
+    assert_eq!(
+        transition_notification_state(NotificationLifecycleState::Authorized, "schedule"),
+        Some(NotificationLifecycleState::Scheduled)
+    );
+    assert_eq!(
+        transition_notification_state(NotificationLifecycleState::Scheduled, "cancel"),
+        Some(NotificationLifecycleState::Cancelled)
+    );
+    assert_eq!(
+        transition_notification_state(NotificationLifecycleState::Delivered, "cancel"),
+        None
+    );
 }
 
 #[tokio::test]

@@ -52,6 +52,46 @@ pub enum NotificationRuntimeEventKind {
     Unavailable,
 }
 
+/// Provider-neutral lifecycle states for authorization, delivery, and interaction.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum NotificationLifecycleState {
+    Requested,
+    Authorized,
+    Scheduled,
+    Delivered,
+    Cancelled,
+    Expired,
+    Revoked,
+}
+
+/// Fail closed on invalid notification lifecycle transitions.
+pub fn transition_notification_state(
+    state: NotificationLifecycleState,
+    operation: &str,
+) -> Option<NotificationLifecycleState> {
+    match (state, operation) {
+        (NotificationLifecycleState::Requested, "authorize") => {
+            Some(NotificationLifecycleState::Authorized)
+        }
+        (NotificationLifecycleState::Authorized, "schedule") => {
+            Some(NotificationLifecycleState::Scheduled)
+        }
+        (NotificationLifecycleState::Scheduled, "deliver") => {
+            Some(NotificationLifecycleState::Delivered)
+        }
+        (NotificationLifecycleState::Scheduled, "cancel") => {
+            Some(NotificationLifecycleState::Cancelled)
+        }
+        (NotificationLifecycleState::Scheduled, "expire") => {
+            Some(NotificationLifecycleState::Expired)
+        }
+        (NotificationLifecycleState::Authorized, "revoke") => {
+            Some(NotificationLifecycleState::Revoked)
+        }
+        _ => None,
+    }
+}
+
 /// Deterministic mock or unavailable notification provider behind `SystemService`.
 pub struct NotificationSystemServiceProvider {
     descriptor: ServiceDescriptor,
@@ -181,6 +221,19 @@ impl SystemService for NotificationSystemServiceProvider {
         if !COMMUNICATION_NOTIFICATION_COMMANDS.contains(&command.name.as_str()) {
             return Err(ServiceError::UnsupportedCommand(command.name.to_string()));
         }
+        if let Some(reason) = notification_admission_denial(command.name.as_str(), &command.payload)
+        {
+            let _ = self.events.send(event(
+                &command.name.to_string(),
+                &trace.trace_id,
+                NotificationRuntimeEventKind::PolicyDecision,
+                NotificationDeliveryStatus::Failed,
+            ));
+            return Err(ServiceError::DisabledByPolicy(reason.into()));
+        }
+        if self.deliveries.read().await.len() >= 128 {
+            return Err(ServiceError::DisabledByPolicy("quota_exceeded".into()));
+        }
         let status = status_for(command.name.as_str());
         let idempotency_key = command
             .metadata
@@ -249,6 +302,46 @@ impl SystemService for NotificationSystemServiceProvider {
         ));
         Ok(health)
     }
+}
+
+fn notification_admission_denial(
+    command: &str,
+    payload: &serde_json::Value,
+) -> Option<&'static str> {
+    let blocked = |key: &str, reason: &'static str| {
+        (payload.get(key).and_then(serde_json::Value::as_bool) == Some(true)).then_some(reason)
+    };
+    blocked("authorization_denied", "authorization_denied")
+        .or_else(|| blocked("prompt_not_allowed", "prompt_not_allowed"))
+        .or_else(|| blocked("content_blocked", "sensitive_content_blocked"))
+        .or_else(|| blocked("background_action_denied", "background_action_denied"))
+        .or_else(|| blocked("interaction_expired", "interaction_expired"))
+        .or_else(|| blocked("quiet_hours", "quiet_hours"))
+        .or_else(|| blocked("lock_screen_sensitive", "lock_screen_sensitive"))
+        .or_else(|| blocked("approval_required", "approval_required"))
+        .or_else(|| blocked("quota_exceeded", "quota_exceeded"))
+        .or_else(|| {
+            (payload
+                .get("content_size_bytes")
+                .and_then(serde_json::Value::as_u64)
+                .is_some_and(|size| size > 65_536))
+            .then_some("content_too_large")
+        })
+        .or_else(|| {
+            (payload
+                .get("action_count")
+                .and_then(serde_json::Value::as_u64)
+                .is_some_and(|count| count > 8))
+            .then_some("action_limit_exceeded")
+        })
+        .or_else(|| {
+            (command == "notification.schedule"
+                && payload
+                    .get("schedule_horizon_days")
+                    .and_then(serde_json::Value::as_u64)
+                    .is_some_and(|days| days > 30))
+            .then_some("schedule_too_far")
+        })
 }
 
 /// Descriptor derived from the proto pack contract, never from a platform provider.
