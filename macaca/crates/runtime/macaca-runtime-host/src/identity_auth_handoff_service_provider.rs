@@ -21,6 +21,10 @@ use macaca_proto::{
 use tokio::sync::{broadcast, RwLock};
 use tracing::{info, warn};
 
+use crate::identity_auth_handoff_strategy::{
+    AuthHandoffProviderStrategy, ConfiguredAuthHandoffStrategy,
+};
+
 /// Sanitized auth-handoff event for observers, audits, and replay indices.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct IdentityAuthHandoffRuntimeEvent {
@@ -57,6 +61,7 @@ pub struct IdentityAuthHandoffSystemServiceProvider {
     events: broadcast::Sender<IdentityAuthHandoffRuntimeEvent>,
     references: RwLock<BTreeMap<String, String>>,
     consumed_callback_refs: RwLock<BTreeSet<String>>,
+    strategy: ConfiguredAuthHandoffStrategy,
     unavailable_reason: Option<String>,
 }
 
@@ -78,8 +83,16 @@ impl IdentityAuthHandoffSystemServiceProvider {
             events,
             references: RwLock::new(BTreeMap::new()),
             consumed_callback_refs: RwLock::new(BTreeSet::new()),
+            strategy: ConfiguredAuthHandoffStrategy::synthetic(),
             unavailable_reason,
         }
+    }
+
+    /// Construct a mock with an explicit capability gap for conformance tests.
+    pub fn mock_with_protocols(protocol_profiles: BTreeSet<String>) -> Self {
+        let mut provider = Self::new(None);
+        provider.strategy = ConfiguredAuthHandoffStrategy::new(protocol_profiles);
+        provider
     }
 
     /// Report protocol support as generic contract facts, not vendor routing.
@@ -116,6 +129,12 @@ impl IdentityAuthHandoffSystemServiceProvider {
     /// Subscribe to reference-only handoff events.
     pub fn subscribe(&self) -> broadcast::Receiver<IdentityAuthHandoffRuntimeEvent> {
         self.events.subscribe()
+    }
+
+    /// Normalize provider failure facts without retaining provider payloads.
+    pub fn normalize_provider_error(&self, code: &str, retriable: bool) -> (String, bool) {
+        let decision = self.strategy.normalize_error(code, retriable);
+        (decision.reason_code.into(), decision.retriable)
     }
 
     /// Return bounded replay metadata without retaining handoff payloads.
@@ -207,6 +226,22 @@ impl SystemService for IdentityAuthHandoffSystemServiceProvider {
                 IdentityAuthHandoffRuntimeEventKind::PolicyDecision,
             ));
             return Err(ServiceError::DisabledByPolicy(reason.into()));
+        }
+        let protocol_decision = self.strategy.validate_protocol(
+            command
+                .payload
+                .get("protocol")
+                .and_then(serde_json::Value::as_str),
+        );
+        if !protocol_decision.accepted {
+            let _ = self.events.send(event(
+                "auth_handoff.policy_decision",
+                &trace.trace_id,
+                IdentityAuthHandoffRuntimeEventKind::PolicyDecision,
+            ));
+            return Err(ServiceError::DisabledByPolicy(
+                protocol_decision.reason_code.into(),
+            ));
         }
         if self.references.read().await.len() >= 100 {
             return Err(ServiceError::DisabledByPolicy("quota_exceeded".into()));

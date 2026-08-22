@@ -154,6 +154,29 @@ async fn auth_handoff_admission_denies_policy_facts_before_provider_state() {
     assert_eq!(provider.snapshot().await["active_reference_count"], "0");
 }
 
+#[tokio::test]
+async fn auth_handoff_strategy_capability_gaps_fail_closed_before_provider_state() {
+    let provider = IdentityAuthHandoffSystemServiceProvider::mock_with_protocols(
+        std::collections::BTreeSet::from(["oidc_reference".into()]),
+    );
+    let result = provider
+        .call(ServiceCommand::with_trace(
+            ServiceCommandName::new("auth_handoff.start_handoff"),
+            serde_json::json!({"protocol": "saml_reference"}),
+            TraceContext::new("unsupported-protocol"),
+        ))
+        .await;
+    assert!(
+        matches!(result, Err(ServiceError::DisabledByPolicy(reason)) if reason == "protocol_unsupported")
+    );
+    assert_eq!(provider.snapshot().await["active_reference_count"], "0");
+    assert_eq!(
+        IdentityAuthHandoffSystemServiceProvider::mock()
+            .normalize_provider_error("rate_limit", true),
+        ("provider_quota".into(), true)
+    );
+}
+
 fn command(name: &str, trace_id: &str) -> ServiceCommand {
     ServiceCommand::with_trace(
         ServiceCommandName::new(name),

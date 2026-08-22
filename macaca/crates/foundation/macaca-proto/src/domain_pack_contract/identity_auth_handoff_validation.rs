@@ -254,3 +254,62 @@ impl AuthHandoffArtifactHandle {
             && bounded_identity_reference(&self.access_policy_ref, 160)
     }
 }
+
+use super::identity_auth_handoff::{AUTH_HANDOFF_PERMISSION_SCOPES, IDENTITY_AUTH_HANDOFF_PACK_ID};
+use super::model::AppServiceContractConfig;
+
+/// Reject auth-handoff scopes outside the descriptor-owned vocabulary.
+pub fn validate_identity_auth_handoff_permission_declarations(
+    declaration: &AppServiceContractConfig,
+) -> Result<(), &'static str> {
+    let Some(scopes) = declaration
+        .pack_permission_scopes
+        .get(IDENTITY_AUTH_HANDOFF_PACK_ID)
+    else {
+        return Ok(());
+    };
+    let declared = declaration
+        .use_packs
+        .iter()
+        .chain(declaration.required_packs.iter())
+        .chain(declaration.optional_packs.iter())
+        .any(|pack| pack == IDENTITY_AUTH_HANDOFF_PACK_ID);
+    if !declared {
+        return Err("auth handoff permissions require the auth handoff pack");
+    }
+    if scopes
+        .iter()
+        .any(|scope| !AUTH_HANDOFF_PERMISSION_SCOPES.contains(&scope.as_str()))
+    {
+        return Err("auth handoff permission scope is not declared by the pack");
+    }
+    Ok(())
+}
+
+#[cfg(test)]
+mod permission_tests {
+    use super::*;
+    use std::collections::{BTreeMap, BTreeSet};
+
+    #[test]
+    fn auth_handoff_permissions_are_descriptor_owned() {
+        let valid = AppServiceContractConfig {
+            optional_packs: vec![IDENTITY_AUTH_HANDOFF_PACK_ID.into()],
+            pack_permission_scopes: BTreeMap::from([(
+                IDENTITY_AUTH_HANDOFF_PACK_ID.into(),
+                BTreeSet::from(["identity.auth.handoff.start".into()]),
+            )]),
+            ..Default::default()
+        };
+        assert!(validate_identity_auth_handoff_permission_declarations(&valid).is_ok());
+        let invalid = AppServiceContractConfig {
+            optional_packs: vec![IDENTITY_AUTH_HANDOFF_PACK_ID.into()],
+            pack_permission_scopes: BTreeMap::from([(
+                IDENTITY_AUTH_HANDOFF_PACK_ID.into(),
+                BTreeSet::from(["identity.auth.native".into()]),
+            )]),
+            ..Default::default()
+        };
+        assert!(validate_identity_auth_handoff_permission_declarations(&invalid).is_err());
+    }
+}

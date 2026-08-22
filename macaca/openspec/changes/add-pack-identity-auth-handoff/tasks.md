@@ -46,16 +46,16 @@
 ## 5. Service Provider, Provider Strategy, And Unavailable Behavior
 
 - [x] 5.1 Add the auth handoff service provider interface with descriptor, lifecycle, health, snapshot, shutdown, timeout, cancellation, async callback/export support, and command dispatch.
-- [ ] 5.2 Implement provider Strategy adapters behind the service interface without provider-name routing in OS-layer command logic.
-- [ ] 5.3 Implement a mock provider with synthetic OAuth/OIDC/SAML/WebAuthn handoffs, callbacks, token references, subject evidence, session binding, replay rejection, expiry, and configurable capability gaps.
+- [x] 5.2 Implement provider Strategy adapters behind the service interface without provider-name routing in OS-layer command logic.
+- [x] 5.3 Implement a mock provider with synthetic OAuth/OIDC/SAML/WebAuthn handoffs, callbacks, token references, subject evidence, session binding, replay rejection, expiry, and configurable capability gaps.
 - [x] 5.4 Implement an unavailable provider that returns explicit unavailable diagnostics for every command without fake success.
-- [ ] 5.5 Normalize provider errors into Macaca result envelopes while preserving sanitized provider class, bounded code, retriable flag, handoff state, callback state, freshness, replay status, and replay pointer.
+- [x] 5.5 Normalize provider errors into Macaca result envelopes while preserving sanitized provider class, bounded code, retriable flag, handoff state, callback state, freshness, replay status, and replay pointer.
 - [x] 5.6 Add provider capability discovery for protocol support, PKCE/nonce/state support, SAML support, WebAuthn/passkey support, device/magic link support, callback bindings, token-reference support, session-bind support, expiry, freshness, limits, attribution, and entitlement.
 
 ## 6. SDK, Admission, Examples, And Developer Documentation
 
 - [x] 6.1 Extend pack catalog and SDK discovery for `pack.identity.auth.handoff.v1` with schemas, scopes, examples, availability, health, diagnostics, compatibility, provider class, and docs metadata.
-- [ ] 6.2 Extend application admission so required declarations block on unavailable/denied states and optional declarations degrade explicitly with effective capability mementos.
+- [x] 6.2 Extend application admission so required declarations block on unavailable/denied states and optional declarations degrade explicitly with effective capability mementos.
 - [x] 6.3 Add SDK command helper builders that only construct canonical traced service calls and never construct providers.
 - [x] 6.4 Add generic app-facing examples for planning/starting handoffs, handling callbacks, exchanging token references, inspecting subject evidence, planning/binding sessions, cancelling handoffs, exporting audit evidence, and handling replay/conflicts.
 - [x] 6.5 Create `docs/developer-packs/identity/auth-handoff.md` with purpose, manifest declaration, scopes, commands, DTOs, examples, unavailable diagnostics, provider replacement, trace/audit behavior, redaction, idempotency, redirect allowlists, replay protection, expiry, protocol support, token-reference boundaries, and account/profile/organization/tenant/session/secrets/browser/device/application-login boundaries.
@@ -64,7 +64,7 @@
 ## 7. Trace, Audit, Replay, And Redaction
 
 - [x] 7.1 Emit sanitized declaration, admission, provider-inspection, policy, entitlement, approval, resource, service-call, handoff-planning, callback-verification, token-reference-exchange, session-binding-planning, unavailable, health, snapshot, and result events.
-- [ ] 7.2 Add trace schemas for `auth_handoff_pack_declared`, `auth_handoff_pack_admission_validated`, `auth_handoff_pack_policy_decision`, `auth_handoff_pack_provider_inspected`, `auth_handoff_pack_service_call_requested`, `auth_handoff_pack_service_call_succeeded`, `auth_handoff_pack_service_call_failed`, `auth_handoff_pack_handoff_planned`, `auth_handoff_pack_callback_verified`, `auth_handoff_pack_token_reference_exchanged`, `auth_handoff_pack_session_binding_planned`, `auth_handoff_pack_unavailable`, and `auth_handoff_pack_snapshot_recorded`.
+- [x] 7.2 Add trace schemas for `auth_handoff_pack_declared`, `auth_handoff_pack_admission_validated`, `auth_handoff_pack_policy_decision`, `auth_handoff_pack_provider_inspected`, `auth_handoff_pack_service_call_requested`, `auth_handoff_pack_service_call_succeeded`, `auth_handoff_pack_service_call_failed`, `auth_handoff_pack_handoff_planned`, `auth_handoff_pack_callback_verified`, `auth_handoff_pack_token_reference_exchanged`, `auth_handoff_pack_session_binding_planned`, `auth_handoff_pack_unavailable`, and `auth_handoff_pack_snapshot_recorded`.
 - [x] 7.3 Add replay tests proving every command is trace-addressable through the canonical service runtime path.
 - [x] 7.4 Add snapshot tests proving descriptor, provider health, command availability, protocol/callback/token/session-bind support, policy-template hash, redaction profile, pending handoff counters, resource counters, freshness, and replay pointers are retained without raw payload leakage.
 - [x] 7.5 Add redaction tests proving raw authorization codes, raw tokens, ID tokens, SAML assertions, WebAuthn assertion bodies, PKCE verifiers, client secrets, session cookies, raw callback payloads, raw provider responses, private keys, and signatures never enter logs, traces, snapshots, or SDK diagnostics.
@@ -76,7 +76,7 @@
 - [x] 8.2 Add no-direct-provider-call tests proving all callable operations traverse descriptor-owned service registration and typed service commands.
 - [x] 8.3 Add canonical execution-path tests covering read-only, start, callback verify, token-reference exchange, subject evidence, session binding, cancel, expire, audit export, denied, unavailable, unsupported, conflict, quota, stale-data, replay-rejected, and redaction paths.
 - [x] 8.4 Add provider replacement tests for built-in, plugin, remote, mock, and unavailable providers.
-- [ ] 8.5 Add boundary tests proving auth handoff commands do not perform account lifecycle, profile updates, organization membership changes, tenant policy changes, session store implementation, credential vaulting, MFA policy decisions, risk scoring, or application-specific login UI behavior.
+- [x] 8.5 Add boundary tests proving auth handoff commands do not perform account lifecycle, profile updates, organization membership changes, tenant policy changes, session store implementation, credential vaulting, MFA policy decisions, risk scoring, or application-specific login UI behavior.
 - [x] 8.6 Add file-size and module-ownership checks for any new implementation files.
 - [x] 8.7 Run `openspec validate add-pack-identity-auth-handoff --strict`.
-- [ ] 8.8 Run targeted cargo checks/tests, dependency-boundary gates, audit replay checks, redaction checks, callback replay checks, and auth/account/profile/organization/tenant/session/secrets/browser/device boundary checks before marking implementation tasks complete.
+- [x] 8.8 Run targeted cargo checks/tests, dependency-boundary gates, audit replay checks, redaction checks, callback replay checks, and auth/account/profile/organization/tenant/session/secrets/browser/device boundary checks before marking implementation tasks complete.

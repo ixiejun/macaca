@@ -314,6 +314,7 @@ pub use super::foundation_time_semantics::{
     preflight_timer, release_timer, reserve_timer, TimeAdmissionContext, TimeAdmissionFailure,
     TimeResourceLimits, TimeResourceReservation,
 };
+pub use super::identity_auth_handoff_validation::validate_identity_auth_handoff_permission_declarations;
 pub use super::identity_organization_semantics::{
     filtered_organization_page, preserved_role_history, OrganizationInvitationLifecycle,
     OrganizationLifecycle, OrganizationLifecycleSpec, OrganizationMembershipLifecycle,

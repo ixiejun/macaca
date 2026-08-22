@@ -297,6 +297,9 @@ mod hook_service_provider_tests;
 mod identity_account_service_provider_tests;
 #[cfg(test)]
 mod identity_auth_handoff_service_provider_tests;
+mod identity_auth_handoff_strategy;
+#[cfg(test)]
+mod identity_auth_handoff_strategy_tests;
 #[cfg(test)]
 mod identity_governance_service_provider_tests;
 #[cfg(test)]

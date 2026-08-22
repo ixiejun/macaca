@@ -11,13 +11,15 @@ use std::sync::Arc;
 use macaca_proto::{
     expand_service_capabilities, validate_audio_permission_declarations,
     validate_camera_permission_declarations, validate_filesystem_root_declarations,
-    validate_host_lifecycle_permission_declarations, validate_key_value_namespace_declarations,
-    validate_knowledge_graph_permission_declarations, validate_local_files_permission_declarations,
-    validate_secret_reference_declarations, validate_session_state_declarations,
-    validate_transcription_permission_declarations, ApplicationAbiDeclaration, ApplicationAbiError,
-    ApplicationCheckpoint, ApplicationExport, ApplicationHostCommandResult,
-    ApplicationHostCommandStatus, ApplicationLifecycleState, DomainPackCatalog,
-    EffectiveServiceCapabilities, InMemoryDomainPackCatalog, PackageDescriptor, PackageRuntimeKind,
+    validate_host_lifecycle_permission_declarations,
+    validate_identity_auth_handoff_permission_declarations,
+    validate_key_value_namespace_declarations, validate_knowledge_graph_permission_declarations,
+    validate_local_files_permission_declarations, validate_secret_reference_declarations,
+    validate_session_state_declarations, validate_transcription_permission_declarations,
+    ApplicationAbiDeclaration, ApplicationAbiError, ApplicationCheckpoint, ApplicationExport,
+    ApplicationHostCommandResult, ApplicationHostCommandStatus, ApplicationLifecycleState,
+    DomainPackCatalog, EffectiveServiceCapabilities, InMemoryDomainPackCatalog, PackageDescriptor,
+    PackageRuntimeKind,
 };
 use tracing::{info, warn};
 
@@ -186,6 +188,10 @@ impl ApplicationAbiAdapter for YamlApplicationAbiAdapter {
             })?;
             validate_local_files_permission_declarations(service_contract).map_err(|reason| {
                 warn!(application_id = %application_id, reason, "application ABI local files permission admission rejected");
+                ApplicationAbiError::InvalidDeclaration(reason.into())
+            })?;
+            validate_identity_auth_handoff_permission_declarations(service_contract).map_err(|reason| {
+                warn!(application_id = %application_id, reason, "application ABI auth handoff permission admission rejected");
                 ApplicationAbiError::InvalidDeclaration(reason.into())
             })?;
         }
@@ -442,6 +448,10 @@ mod knowledge_graph_tests;
 #[cfg(test)]
 #[path = "abi_device_local_files_tests.rs"]
 mod device_local_files_tests;
+
+#[cfg(test)]
+#[path = "abi_identity_auth_handoff_tests.rs"]
+mod identity_auth_handoff_tests;
 
 #[cfg(test)]
 #[path = "abi_time_tests.rs"]

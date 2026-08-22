@@ -12,6 +12,23 @@ use super::model::{DomainPackDefinition, DomainPackProviderCapabilityState};
 pub const IDENTITY_AUTH_HANDOFF_PACK_ID: &str = "pack.identity.auth.handoff.v1";
 pub const IDENTITY_AUTH_HANDOFF_SERVICE_ID: &str = "service.identity.auth_handoff";
 
+/// Stable trace vocabulary for auth-handoff observability and replay indexes.
+pub const IDENTITY_AUTH_HANDOFF_TRACE_EVENTS: &[&str] = &[
+    "auth_handoff_pack_declared",
+    "auth_handoff_pack_admission_validated",
+    "auth_handoff_pack_policy_decision",
+    "auth_handoff_pack_provider_inspected",
+    "auth_handoff_pack_service_call_requested",
+    "auth_handoff_pack_service_call_succeeded",
+    "auth_handoff_pack_service_call_failed",
+    "auth_handoff_pack_handoff_planned",
+    "auth_handoff_pack_callback_verified",
+    "auth_handoff_pack_token_reference_exchanged",
+    "auth_handoff_pack_session_binding_planned",
+    "auth_handoff_pack_unavailable",
+    "auth_handoff_pack_snapshot_recorded",
+];
+
 pub const IDENTITY_AUTH_HANDOFF_COMMANDS: &[&str] = &[
     "auth_handoff.inspect_provider",
     "auth_handoff.describe_schema",
@@ -29,7 +46,7 @@ pub const IDENTITY_AUTH_HANDOFF_COMMANDS: &[&str] = &[
     "auth_handoff.get_artifact_handle",
 ];
 
-const AUTH_HANDOFF_PERMISSION_SCOPES: &[&str] = &[
+pub(crate) const AUTH_HANDOFF_PERMISSION_SCOPES: &[&str] = &[
     "identity.auth.handoff.start",
     "identity.auth.handoff.callback",
     "identity.auth.handoff.token_reference",
