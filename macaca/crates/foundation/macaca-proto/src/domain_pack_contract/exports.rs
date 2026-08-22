@@ -38,8 +38,9 @@ pub use super::commerce_catalog::{
     CatalogResultEnvelope, CatalogResultStatus, CatalogScope, CatalogSearchCatalogCommand,
     CatalogSearchRequest, CatalogSearchResult, CatalogTaxonomyNode, CatalogVariant,
     CatalogVariantRequestCommand, PriceBook, PriceContext, COMMERCE_CATALOG_COMMANDS,
-    COMMERCE_CATALOG_PACK_ID, COMMERCE_CATALOG_SERVICE_ID,
+    COMMERCE_CATALOG_PACK_ID, COMMERCE_CATALOG_SERVICE_ID, COMMERCE_CATALOG_TRACE_EVENTS,
 };
+pub use super::commerce_catalog_validation_permissions::validate_commerce_catalog_permission_declarations;
 pub use super::commerce_common::{
     CommercePackCommandEnvelope, CommercePackError, CommercePackPage,
 };

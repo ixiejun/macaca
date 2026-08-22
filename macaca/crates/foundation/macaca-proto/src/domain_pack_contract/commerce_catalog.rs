@@ -36,6 +36,20 @@ pub const COMMERCE_CATALOG_COMMANDS: &[&str] = &[
     "catalog.get_artifact_handle",
 ];
 
+pub const COMMERCE_CATALOG_TRACE_EVENTS: &[&str] = &[
+    "catalog_pack_declared",
+    "catalog_pack_admission_validated",
+    "catalog_pack_policy_decision",
+    "catalog_pack_provider_inspected",
+    "catalog_pack_service_call_requested",
+    "catalog_pack_service_call_succeeded",
+    "catalog_pack_service_call_failed",
+    "catalog_pack_mutation_planned",
+    "catalog_pack_publication_requested",
+    "catalog_pack_unavailable",
+    "catalog_pack_snapshot_recorded",
+];
+
 const CATALOG_PERMISSION_SCOPES: &[&str] = &[
     "commerce.catalog.read",
     "commerce.catalog.search",

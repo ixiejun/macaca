@@ -37,25 +37,25 @@
 ## 4. Permission, Policy, Resource, Entitlement, And Approval
 
 - [x] 4.1 Add declaration validation for `commerce.catalog.read`, `commerce.catalog.search`, `commerce.catalog.price`, `commerce.catalog.availability`, `commerce.catalog.write`, `commerce.catalog.publish`, and `commerce.catalog.export`.
-- [ ] 4.2 Require policy decisions before every command and approval before product/variant/media mutation, publish/unpublish, archive, and retained exports.
-- [ ] 4.3 Require entitlement checks for provider access, search support, price support, availability support, write support, publish support, export support, and store/channel access.
-- [ ] 4.4 Reserve and meter resources for search fan-out, facets, pagination, media metadata, export size, provider quotas, storage, and snapshots.
-- [ ] 4.5 Return typed denied/unavailable/unsupported/conflict/quota/stale-data outcomes before provider calls when preconditions fail.
-- [ ] 4.6 Add tests proving denied, unavailable, unsupported, conflict, quota, and stale-data paths do not call concrete providers when preconditions fail.
+- [x] 4.2 Require policy decisions before every command and approval before product/variant/media mutation, publish/unpublish, archive, and retained exports.
+- [x] 4.3 Require entitlement checks for provider access, search support, price support, availability support, write support, publish support, export support, and store/channel access.
+- [x] 4.4 Reserve and meter resources for search fan-out, facets, pagination, media metadata, export size, provider quotas, storage, and snapshots.
+- [x] 4.5 Return typed denied/unavailable/unsupported/conflict/quota/stale-data outcomes before provider calls when preconditions fail.
+- [x] 4.6 Add tests proving denied, unavailable, unsupported, conflict, quota, and stale-data paths do not call concrete providers when preconditions fail.
 
 ## 5. Service Provider, Provider Strategy, And Unavailable Behavior
 
-- [ ] 5.1 Add the catalog service provider interface with descriptor, lifecycle, health, snapshot, shutdown, timeout, cancellation, async search/export support, and command dispatch.
-- [ ] 5.2 Implement provider Strategy adapters behind the service interface without provider-name routing in OS-layer command logic.
-- [ ] 5.3 Implement a mock provider with synthetic products, variants, price books, availability snapshots, taxonomy, search facets, mutation plans, stale-data states, and configurable capability gaps.
+- [x] 5.1 Add the catalog service provider interface with descriptor, lifecycle, health, snapshot, shutdown, timeout, cancellation, async search/export support, and command dispatch.
+- [x] 5.2 Implement provider Strategy adapters behind the service interface without provider-name routing in OS-layer command logic.
+- [x] 5.3 Implement a mock provider with synthetic products, variants, price books, availability snapshots, taxonomy, search facets, mutation plans, stale-data states, and configurable capability gaps.
 - [x] 5.4 Implement an unavailable provider that returns explicit unavailable diagnostics for every command without fake success.
-- [ ] 5.5 Normalize provider errors into Macaca result envelopes while preserving sanitized provider class, bounded code, retriable flag, freshness, and replay pointer.
-- [ ] 5.6 Add provider capability discovery for product model, variant model, price model, availability model, localization, taxonomy, publication, batch/export, search/facet, mutation, limits, freshness, and attribution.
+- [x] 5.5 Normalize provider errors into Macaca result envelopes while preserving sanitized provider class, bounded code, retriable flag, freshness, and replay pointer.
+- [x] 5.6 Add provider capability discovery for product model, variant model, price model, availability model, localization, taxonomy, publication, batch/export, search/facet, mutation, limits, freshness, and attribution.
 
 ## 6. SDK, Admission, Examples, And Developer Documentation
 
 - [x] 6.1 Extend pack catalog and SDK discovery for `pack.commerce.catalog.v1` with schemas, scopes, examples, availability, health, diagnostics, compatibility, provider class, and docs metadata.
-- [ ] 6.2 Extend application admission so required declarations block on unavailable/denied states and optional declarations degrade explicitly with effective capability mementos.
+- [x] 6.2 Extend application admission so required declarations block on unavailable/denied states and optional declarations degrade explicitly with effective capability mementos.
 - [x] 6.3 Add SDK command helper builders that only construct canonical traced service calls and never construct providers.
 - [x] 6.4 Add generic app-facing examples for searching catalog, reading product projection, resolving price, checking availability, planning mutation, publishing, exporting, and handling unsupported filters.
 - [x] 6.5 Create `docs/developer-packs/commerce/catalog.md` with purpose, manifest declaration, scopes, commands, DTOs, examples, unavailable diagnostics, provider replacement, trace/audit behavior, redaction, schema discovery, search semantics, mutation planning, and boundaries with cart/order/payment.
@@ -63,18 +63,18 @@
 
 ## 7. Trace, Audit, Replay, And Redaction
 
-- [ ] 7.1 Emit sanitized declaration, admission, provider-inspection, policy, entitlement, approval, resource, service-call, mutation-planning, publication, unavailable, health, snapshot, and result events.
-- [ ] 7.2 Add trace schemas for `catalog_pack_declared`, `catalog_pack_admission_validated`, `catalog_pack_policy_decision`, `catalog_pack_provider_inspected`, `catalog_pack_service_call_requested`, `catalog_pack_service_call_succeeded`, `catalog_pack_service_call_failed`, `catalog_pack_mutation_planned`, `catalog_pack_publication_requested`, `catalog_pack_unavailable`, and `catalog_pack_snapshot_recorded`.
-- [ ] 7.3 Add replay tests proving every command is trace-addressable through the canonical service runtime path.
-- [ ] 7.4 Add snapshot tests proving descriptor, provider health, command availability, schema/version support, search/export support, policy-template hash, redaction profile, resource counters, freshness, and replay pointers are retained without raw payload leakage.
-- [ ] 7.5 Add redaction tests proving credentials, raw provider payloads, unpublished secrets, full media bytes, provider-specific search DSLs, and unbounded catalog exports never enter logs, traces, snapshots, or SDK diagnostics.
+- [x] 7.1 Emit sanitized declaration, admission, provider-inspection, policy, entitlement, approval, resource, service-call, mutation-planning, publication, unavailable, health, snapshot, and result events.
+- [x] 7.2 Add trace schemas for `catalog_pack_declared`, `catalog_pack_admission_validated`, `catalog_pack_policy_decision`, `catalog_pack_provider_inspected`, `catalog_pack_service_call_requested`, `catalog_pack_service_call_succeeded`, `catalog_pack_service_call_failed`, `catalog_pack_mutation_planned`, `catalog_pack_publication_requested`, `catalog_pack_unavailable`, and `catalog_pack_snapshot_recorded`.
+- [x] 7.3 Add replay tests proving every command is trace-addressable through the canonical service runtime path.
+- [x] 7.4 Add snapshot tests proving descriptor, provider health, command availability, schema/version support, search/export support, policy-template hash, redaction profile, resource counters, freshness, and replay pointers are retained without raw payload leakage.
+- [x] 7.5 Add redaction tests proving credentials, raw provider payloads, unpublished secrets, full media bytes, provider-specific search DSLs, and unbounded catalog exports never enter logs, traces, snapshots, or SDK diagnostics.
 
 ## 8. Boundary, Quality, And Validation Gates
 
-- [ ] 8.1 Add dependency gates proving kernel, SDK, shells, and generic application framework do not import concrete catalog providers.
+- [x] 8.1 Add dependency gates proving kernel, SDK, shells, and generic application framework do not import concrete catalog providers.
 - [x] 8.2 Add no-direct-provider-call tests proving all callable operations traverse descriptor-owned service registration and typed service commands.
-- [ ] 8.3 Add canonical execution-path tests covering read-only, search, price, availability, planning, mutation, publication, export, denied, unavailable, unsupported, conflict, quota, and stale-data paths.
-- [ ] 8.4 Add provider replacement tests for built-in, plugin, remote, mock, and unavailable providers.
+- [x] 8.3 Add canonical execution-path tests covering read-only, search, price, availability, planning, mutation, publication, export, denied, unavailable, unsupported, conflict, quota, and stale-data paths.
+- [x] 8.4 Add provider replacement tests for built-in, plugin, remote, mock, and unavailable providers.
 - [x] 8.5 Add file-size and module-ownership checks for any new implementation files.
 - [x] 8.6 Run `openspec validate add-pack-commerce-catalog --strict`.
-- [ ] 8.7 Run targeted cargo checks/tests, dependency-boundary gates, audit replay checks, redaction checks, and catalog/cart/order boundary checks before marking implementation tasks complete.
+- [x] 8.7 Run targeted cargo checks/tests, dependency-boundary gates, audit replay checks, redaction checks, and catalog/cart/order boundary checks before marking implementation tasks complete.

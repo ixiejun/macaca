@@ -51,6 +51,8 @@ pub mod citation_service_provider;
 pub mod code_intelligence_service_provider;
 pub mod commerce_cart_service_provider;
 mod commerce_cart_strategy;
+pub mod commerce_catalog_service_provider;
+pub mod commerce_catalog_strategy;
 pub mod composed_agent_execution_backend;
 pub(crate) mod config_service_commands;
 pub mod config_service_provider;
@@ -287,6 +289,7 @@ mod citation_service_provider_tests;
 mod code_intelligence_service_provider_tests;
 #[cfg(test)]
 mod commerce_cart_service_provider_tests;
+mod commerce_catalog_service_provider_tests;
 #[cfg(test)]
 mod config_service_provider_tests;
 #[cfg(test)]

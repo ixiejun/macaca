@@ -26,6 +26,7 @@ mod commerce_cart_validation;
 pub mod commerce_catalog;
 mod commerce_catalog_hashes;
 mod commerce_catalog_validation;
+mod commerce_catalog_validation_permissions;
 pub mod commerce_common;
 pub mod commerce_entitlement;
 mod commerce_entitlement_validation;
