@@ -248,3 +248,37 @@ async fn replay_snapshot_is_bounded_and_every_declared_command_has_trace_evidenc
         .all(|value| !value.contains("must-not-enter-replay")));
     assert_eq!(events.recv().await.unwrap().outcome, "snapshot_recorded");
 }
+
+#[tokio::test]
+async fn replay_references_remain_trace_addressable_after_provider_restart() {
+    let trace_id = "transcription-restart-trace";
+    let first = MediaTranscriptionSystemServiceProvider::mock();
+    let _first_result = first
+        .call(ServiceCommand::with_trace(
+            ServiceCommandName::new("transcription.inspect_provider"),
+            serde_json::json!({"raw_audio":"must-not-enter-replay"}),
+            TraceContext::new(trace_id),
+        ))
+        .await
+        .unwrap();
+    let first_ref = format!("replay:transcription:{trace_id}");
+    first.cleanup().await.unwrap();
+
+    // A new provider instance represents a host refresh/restart. The canonical
+    // trace-derived replay reference remains deterministic and payload-free.
+    let restarted = MediaTranscriptionSystemServiceProvider::mock();
+    let mut events = restarted.subscribe();
+    let restarted_result = restarted
+        .call(ServiceCommand::with_trace(
+            ServiceCommandName::new("transcription.inspect_provider"),
+            serde_json::json!({"raw_transcript":"must-not-enter-replay"}),
+            TraceContext::new(trace_id),
+        ))
+        .await
+        .unwrap();
+    let event = events.recv().await.unwrap();
+    assert_eq!(restarted_result.trace.trace_id, trace_id);
+    assert_eq!(event.replay_ref, first_ref);
+    assert_eq!(event.trace_id, trace_id);
+    assert!(!event.replay_ref.contains("must-not-enter-replay"));
+}
