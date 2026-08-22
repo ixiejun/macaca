@@ -25,6 +25,26 @@ pub const FINANCE_MARKET_DATA_COMMANDS: &[&str] = &[
     "market_data.inspect_freshness",
     "market_data.get_artifact_handle",
 ];
+/// Sanitized market-data events for trace, audit, and replay.
+pub const FINANCE_MARKET_DATA_TRACE_EVENTS: &[&str] = &[
+    "market_data_pack_declared",
+    "market_data_admission_validated",
+    "market_data_provider_inspected",
+    "market_data_instrument_searched",
+    "market_data_instrument_read",
+    "market_data_quote_read",
+    "market_data_trade_read",
+    "market_data_bars_read",
+    "market_data_snapshot_read",
+    "market_data_corporate_action_read",
+    "market_data_market_status_read",
+    "market_data_freshness_inspected",
+    "market_data_artifact_handle_issued",
+    "market_data_policy_decision",
+    "market_data_license_checked",
+    "market_data_unavailable",
+    "market_data_snapshot_recorded",
+];
 
 const MARKET_DATA_PERMISSION_SCOPES: &[&str] = &[
     "market_data.provider.inspect",

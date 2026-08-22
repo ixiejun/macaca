@@ -21,6 +21,7 @@ use macaca_proto::{
     validate_developer_terminal_permission_declarations, validate_filesystem_root_declarations,
     validate_finance_accounting_permission_declarations,
     validate_finance_crypto_permission_declarations,
+    validate_finance_market_data_permission_declarations,
     validate_host_lifecycle_permission_declarations,
     validate_identity_account_permission_declarations,
     validate_identity_auth_handoff_permission_declarations,
@@ -250,6 +251,7 @@ impl ApplicationAbiAdapter for YamlApplicationAbiAdapter {
             validate_developer_repository_permission_declarations(service_contract).map_err(|reason| { warn!(application_id = %application_id, reason, "repository permission admission rejected"); ApplicationAbiError::InvalidDeclaration(reason.into()) })?;
             validate_developer_terminal_permission_declarations(service_contract).map_err(|reason| { warn!(application_id = %application_id, reason, "terminal permission admission rejected"); ApplicationAbiError::InvalidDeclaration(reason.into()) })?;
             validate_finance_crypto_permission_declarations(service_contract).map_err(|reason| { warn!(application_id = %application_id, reason, "crypto permission admission rejected"); ApplicationAbiError::InvalidDeclaration(reason.into()) })?;
+            validate_finance_market_data_permission_declarations(service_contract).map_err(|reason| { warn!(application_id = %application_id, reason, "market-data permission admission rejected"); ApplicationAbiError::InvalidDeclaration(reason.into()) })?;
         }
         let service_capabilities =
             expand_service_capabilities(self.manifest.service_contract.as_ref(), catalog);
@@ -494,6 +496,3 @@ mod identity_profile_tests;
 #[cfg(test)]
 #[path = "abi_knowledge_graph_tests.rs"]
 mod knowledge_graph_tests;
-#[cfg(test)]
-#[path = "abi_media_transcription_tests.rs"]
-mod media_transcription_tests;

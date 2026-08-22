@@ -99,6 +99,7 @@ mod finance_crypto_validation_permissions;
 pub mod finance_invoice;
 mod finance_invoice_validation;
 pub mod finance_market_data;
+mod finance_market_data_validation_permissions;
 pub mod finance_portfolio;
 pub mod finance_portfolio_async;
 mod finance_portfolio_validation;

@@ -112,6 +112,8 @@ pub mod finance_accounting_service_provider;
 mod finance_accounting_strategy;
 pub mod finance_crypto_service_provider;
 pub mod finance_crypto_strategy;
+pub mod finance_market_data_service_provider;
+pub mod finance_market_data_strategy;
 pub mod foundation_config_service_provider;
 pub mod foundation_filesystem_service_provider;
 pub mod foundation_key_value_state_service_provider;
@@ -331,6 +333,7 @@ mod email_service_provider_tests;
 mod file_service_provider_tests;
 mod finance_accounting_service_provider_tests;
 mod finance_crypto_service_provider_tests;
+mod finance_market_data_service_provider_tests;
 #[cfg(test)]
 mod git_service_provider_tests;
 #[cfg(test)]
