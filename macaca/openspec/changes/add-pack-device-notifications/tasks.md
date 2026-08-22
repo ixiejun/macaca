@@ -29,7 +29,7 @@
 - [x] 4.3 Add authorization, notification lifecycle, pending schedule, and interaction subscription state machines.
 - [x] 4.4 Add mock and unavailable providers for deterministic tests; host-specific adapters must remain optional providers or plugin/remote modules.
 - [x] 4.5 Add provider conformance tests for authorization, channel/category registration, post, schedule, cancel, pending/history, badge, interaction events, push-support inspection, redaction, and unsupported-command reporting.
-- [ ] 4.6 Add lifecycle, health, snapshot, shutdown, timeout, cancellation, schedule expiry, interaction expiry, resource cleanup, and bounded output behavior.
+- [x] 4.6 Add lifecycle, health, snapshot, shutdown, timeout, cancellation, schedule expiry, interaction expiry, resource cleanup, and bounded output behavior.
 
 ## 5. SDK, Admission, Examples, And ABI
 
