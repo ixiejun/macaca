@@ -120,6 +120,15 @@ impl SystemService for GraphSystemServiceProvider {
                 .send(event("graph.command_failed", &trace.trace_id));
             return Err(ServiceError::UnsupportedCommand(command.name.to_string()));
         }
+        if let Some(reason) = graph_admission_denial(command.name.as_str(), &command.payload) {
+            let _ = self
+                .events
+                .send(event("graph.policy_decision", &trace.trace_id));
+            return Err(ServiceError::DisabledByPolicy(reason.into()));
+        }
+        if self.references.read().await.len() >= 256 {
+            return Err(ServiceError::DisabledByPolicy("quota_exceeded".into()));
+        }
         let reference = format!("graph:reference:{}", trace.trace_id);
         self.references
             .write()
@@ -168,6 +177,38 @@ impl SystemService for GraphSystemServiceProvider {
             None => ServiceHealth::Healthy,
         })
     }
+}
+
+/// Check bounded provider-neutral policy facts before allocating graph references.
+fn graph_admission_denial(command: &str, payload: &serde_json::Value) -> Option<&'static str> {
+    let blocked = |key: &str, reason: &'static str| {
+        (payload.get(key).and_then(serde_json::Value::as_bool) == Some(true)).then_some(reason)
+    };
+    blocked("source_denied", "source_access_denied")
+        .or_else(|| blocked("schema_incompatible", "schema_incompatible"))
+        .or_else(|| blocked("query_sensitive", "query_sensitivity_denied"))
+        .or_else(|| blocked("delete_approval_required", "delete_approval_required"))
+        .or_else(|| blocked("merge_approval_required", "merge_approval_required"))
+        .or_else(|| blocked("redaction_required", "import_export_redaction_required"))
+        .or_else(|| blocked("provider_unavailable", "provider_unavailable"))
+        .or_else(|| blocked("quota_exceeded", "quota_exceeded"))
+        .or_else(|| blocked("timeout", "timeout"))
+        .or_else(|| blocked("cancelled", "cancelled"))
+        .or_else(|| {
+            (command.contains("query")
+                && payload
+                    .get("max_depth")
+                    .and_then(serde_json::Value::as_u64)
+                    .is_some_and(|depth| depth > 5))
+            .then_some("max_depth_exceeded")
+        })
+        .or_else(|| {
+            (payload
+                .get("max_rows")
+                .and_then(serde_json::Value::as_u64)
+                .is_some_and(|rows| rows > 10_000))
+            .then_some("max_rows_exceeded")
+        })
 }
 
 /// Build the descriptor from proto-owned graph contract constants only.

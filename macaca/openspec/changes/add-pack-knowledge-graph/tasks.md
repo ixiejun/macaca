@@ -22,22 +22,22 @@
 
 - [x] 3.1 Implement manifest declaration validation for required and optional `pack.knowledge.graph.v1` declarations.
 - [x] 3.2 Implement permission validation for `graph.store.read`, `graph.store.manage`, `graph.schema.read`, `graph.schema.write`, `graph.node.read`, `graph.node.write`, `graph.edge.read`, `graph.edge.write`, `graph.rdf.read`, `graph.rdf.write`, `graph.query`, `graph.traverse`, `graph.path`, `graph.merge`, `graph.import`, `graph.export`, `graph.provenance.read`, and `graph.provider.inspect`.
-- [ ] 3.3 Implement policy checks before side effects for source access, schema compatibility, write idempotency, query sensitivity, provenance visibility, delete approval, merge approval, import/export redaction, and provider capability.
-- [ ] 3.4 Implement resource reservation for max rows, max depth, max fanout, timeout, memory, storage, network, provider quota, import batch size, export size, and retained snapshots.
-- [ ] 3.5 Implement entitlement checks and structured unavailable/denied diagnostics for missing provider, disabled pack, missing entitlement, missing permission, absent graph model, unsupported query dialect, unsupported import/export format, disabled network, and host resource denial.
-- [ ] 3.6 Implement approval behavior for irreversible deletion, irreversible merge, cross-source merge, high-cardinality import/export, sensitive provenance disclosure, and long-running graph jobs.
-- [ ] 3.7 Add tests proving denied, validation, quota, unavailable, and approval-required paths do not call concrete providers.
+- [x] 3.3 Implement policy checks before side effects for source access, schema compatibility, write idempotency, query sensitivity, provenance visibility, delete approval, merge approval, import/export redaction, and provider capability.
+- [x] 3.4 Implement resource reservation for max rows, max depth, max fanout, timeout, memory, storage, network, provider quota, import batch size, export size, and retained snapshots.
+- [x] 3.5 Implement entitlement checks and structured unavailable/denied diagnostics for missing provider, disabled pack, missing entitlement, missing permission, absent graph model, unsupported query dialect, unsupported import/export format, disabled network, and host resource denial.
+- [x] 3.6 Implement approval behavior for irreversible deletion, irreversible merge, cross-source merge, high-cardinality import/export, sensitive provenance disclosure, and long-running graph jobs.
+- [x] 3.7 Add tests proving denied, validation, quota, unavailable, and approval-required paths do not call concrete providers.
 
 ## 4. Service Provider And Runtime Integration
 
 - [x] 4.1 Implement or bind the knowledge graph service provider behind the service runtime; do not construct graph providers from SDK, shell, kernel, or application code.
 - [x] 4.2 Add a deterministic unavailable provider that returns typed unavailable/unsupported diagnostics and complete discovery metadata.
 - [x] 4.3 Add mock provider support for property graph commands, RDF commands, query validation, traversal, path, import/export dry-run, merge conflict, provenance inspection, and provider capability inspection.
-- [ ] 4.4 Add lifecycle, health, snapshot, shutdown, timeout, cancellation, bounded streaming, and paginated result behavior.
+- [x] 4.4 Add lifecycle, health, snapshot, shutdown, timeout, cancellation, bounded streaming, and paginated result behavior.
 - [ ] 4.5 Add query validation adapters as Strategy implementations for portable graph query, Cypher-like, SPARQL, Gremlin-like, GSQL-like, and provider-declared modes without hardcoding provider names in OS routing.
 - [ ] 4.6 Add import/export adapters as Strategy implementations for provider-neutral graph bundles, RDF-like datasets, JSON-LD-like documents, CSV-like loads, and paged export handles.
 - [ ] 4.7 Add merge/conflict Strategy hooks for deterministic entity merge, reversible alias mapping where possible, conflict diagnostics, and audit reasons.
-- [ ] 4.8 Add provider capability reporting for available, degraded, preview, unavailable, unsupported, retired, model-specific, dialect-specific, and quota-limited states.
+- [x] 4.8 Add provider capability reporting for available, degraded, preview, unavailable, unsupported, retired, model-specific, dialect-specific, and quota-limited states.
 
 ## 5. SDK, WASM ABI, Application Framework, And Examples
 

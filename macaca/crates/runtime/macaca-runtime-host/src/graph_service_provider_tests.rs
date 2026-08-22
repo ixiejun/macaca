@@ -136,6 +136,32 @@ async fn graph_emits_stable_audit_taxonomy() {
     }
 }
 
+#[tokio::test]
+async fn graph_admission_denies_policy_facts_before_reference_allocation() {
+    let provider = GraphSystemServiceProvider::mock();
+    for (trace, payload) in [
+        ("source", serde_json::json!({"source_denied": true})),
+        ("schema", serde_json::json!({"schema_incompatible": true})),
+        ("sensitive", serde_json::json!({"query_sensitive": true})),
+        (
+            "delete",
+            serde_json::json!({"delete_approval_required": true}),
+        ),
+        ("depth", serde_json::json!({"max_depth": 6})),
+        ("rows", serde_json::json!({"max_rows": 10_001})),
+    ] {
+        let result = provider
+            .call(ServiceCommand::with_trace(
+                ServiceCommandName::new("graph.query"),
+                payload,
+                TraceContext::new(trace),
+            ))
+            .await;
+        assert!(matches!(result, Err(ServiceError::DisabledByPolicy(_))));
+    }
+    assert_eq!(provider.snapshot().await["active_reference_count"], "0");
+}
+
 fn command(name: &str, trace_id: &str) -> ServiceCommand {
     ServiceCommand::with_trace(
         ServiceCommandName::new(name),
