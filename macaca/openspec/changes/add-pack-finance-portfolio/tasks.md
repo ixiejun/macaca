@@ -35,25 +35,25 @@
 ## 4. Permission, Consent, Policy, Resource, Entitlement, And Approval
 
 - [x] 4.1 Add declaration validation for `finance.portfolio.read`, `finance.portfolio.analytics`, `finance.portfolio.report`, and `finance.portfolio.intent.write`.
-- [ ] 4.2 Require consent and entitlement checks for account data, transaction data, lots, analytics, exports, and retained reports.
-- [ ] 4.3 Require policy decisions before every command and approval before retained reports or rebalance-intent persistence.
+- [x] 4.2 Require consent and entitlement checks for account data, transaction data, lots, analytics, exports, and retained reports.
+- [x] 4.3 Require policy decisions before every command and approval before retained reports or rebalance-intent persistence.
 - [x] 4.4 Enforce no-advice metadata for allocation, performance, risk, scenario, and rebalance-intent outputs.
-- [ ] 4.5 Reserve and meter resources for account fan-out, pagination, analytics jobs, report/export size, storage, provider quotas, and snapshots.
-- [ ] 4.6 Add tests proving denied, unavailable, unsupported, quota, and stale-data paths do not call concrete providers when preconditions fail.
+- [x] 4.5 Reserve and meter resources for account fan-out, pagination, analytics jobs, report/export size, storage, provider quotas, and snapshots.
+- [x] 4.6 Add tests proving denied, unavailable, unsupported, quota, and stale-data paths do not call concrete providers when preconditions fail.
 
 ## 5. Service Provider, Provider Strategy, And Unavailable Behavior
 
-- [ ] 5.1 Add the portfolio service provider interface with descriptor, lifecycle, health, snapshot, shutdown, timeout, cancellation, and command dispatch.
-- [ ] 5.2 Implement provider Strategy adapters behind the service interface without provider-name routing in OS-layer command logic.
-- [ ] 5.3 Implement a mock provider with synthetic accounts, holdings, transactions, analytics, stale-data states, and configurable capability gaps.
+- [x] 5.1 Add the portfolio service provider interface with descriptor, lifecycle, health, snapshot, shutdown, timeout, cancellation, and command dispatch.
+- [x] 5.2 Implement provider Strategy adapters behind the service interface without provider-name routing in OS-layer command logic.
+- [x] 5.3 Implement a mock provider with synthetic accounts, holdings, transactions, analytics, stale-data states, and configurable capability gaps.
 - [x] 5.4 Implement an unavailable provider that returns explicit unavailable diagnostics for every command without fake success.
-- [ ] 5.5 Normalize provider errors into Macaca result envelopes while preserving sanitized provider class, bounded code, retriable flag, freshness, and replay pointer.
-- [ ] 5.6 Add provider capability discovery for account types, instrument classes, lots, transaction history depth, performance methods, risk/scenario support, export formats, freshness, and attribution.
+- [x] 5.5 Normalize provider errors into Macaca result envelopes while preserving sanitized provider class, bounded code, retriable flag, freshness, and replay pointer.
+- [x] 5.6 Add provider capability discovery for account types, instrument classes, lots, transaction history depth, performance methods, risk/scenario support, export formats, freshness, and attribution.
 
 ## 6. SDK, Admission, Examples, And Developer Documentation
 
 - [x] 6.1 Extend pack catalog and SDK discovery for `pack.finance.portfolio.v1` with schemas, scopes, examples, availability, health, diagnostics, compatibility, provider class, and docs metadata.
-- [ ] 6.2 Extend application admission so required declarations block on unavailable/denied states and optional declarations degrade explicitly with effective capability mementos.
+- [x] 6.2 Extend application admission so required declarations block on unavailable/denied states and optional declarations degrade explicitly with effective capability mementos.
 - [x] 6.3 Add SDK command helper builders that only construct canonical traced service calls and never construct providers.
 - [x] 6.4 Add generic app-facing examples for listing positions, calculating allocation, calculating performance, summarizing risk, planning a rebalance intent, and handling unsupported analytics.
 - [x] 6.5 Create `docs/developer-packs/finance/portfolio.md` with purpose, manifest declaration, scopes, commands, DTOs, examples, unavailable diagnostics, provider replacement, trace/audit behavior, redaction, methodology, no-advice boundaries, and provider capability differences.
@@ -61,18 +61,18 @@
 
 ## 7. Trace, Audit, Replay, And Redaction
 
-- [ ] 7.1 Emit sanitized declaration, admission, provider-inspection, policy, consent, entitlement, approval, resource, service-call, analytics-job, rebalance-intent, unavailable, health, snapshot, and result events.
-- [ ] 7.2 Add trace schemas for `portfolio_pack_declared`, `portfolio_pack_admission_validated`, `portfolio_pack_policy_decision`, `portfolio_pack_provider_inspected`, `portfolio_pack_service_call_requested`, `portfolio_pack_service_call_succeeded`, `portfolio_pack_service_call_failed`, `portfolio_pack_analytics_job_started`, `portfolio_pack_rebalance_intent_planned`, `portfolio_pack_unavailable`, and `portfolio_pack_snapshot_recorded`.
-- [ ] 7.3 Add replay tests proving every command is trace-addressable through the canonical service runtime path.
-- [ ] 7.4 Add snapshot tests proving descriptor, provider health, command availability, consent, freshness, analytics/export support, redaction profile, resource counters, and replay pointers are retained without raw payload leakage.
-- [ ] 7.5 Add redaction tests proving credentials, raw account numbers, raw provider payloads, full holdings/transactions, proprietary model dumps, and unbounded report content never enter logs, traces, snapshots, or SDK diagnostics.
+- [x] 7.1 Emit sanitized declaration, admission, provider-inspection, policy, consent, entitlement, approval, resource, service-call, analytics-job, rebalance-intent, unavailable, health, snapshot, and result events.
+- [x] 7.2 Add trace schemas for `portfolio_pack_declared`, `portfolio_pack_admission_validated`, `portfolio_pack_policy_decision`, `portfolio_pack_provider_inspected`, `portfolio_pack_service_call_requested`, `portfolio_pack_service_call_succeeded`, `portfolio_pack_service_call_failed`, `portfolio_pack_analytics_job_started`, `portfolio_pack_rebalance_intent_planned`, `portfolio_pack_unavailable`, and `portfolio_pack_snapshot_recorded`.
+- [x] 7.3 Add replay tests proving every command is trace-addressable through the canonical service runtime path.
+- [x] 7.4 Add snapshot tests proving descriptor, provider health, command availability, consent, freshness, analytics/export support, redaction profile, resource counters, and replay pointers are retained without raw payload leakage.
+- [x] 7.5 Add redaction tests proving credentials, raw account numbers, raw provider payloads, full holdings/transactions, proprietary model dumps, and unbounded report content never enter logs, traces, snapshots, or SDK diagnostics.
 
 ## 8. Boundary, Quality, And Validation Gates
 
-- [ ] 8.1 Add dependency gates proving kernel, SDK, shells, and generic application framework do not import concrete portfolio providers.
+- [x] 8.1 Add dependency gates proving kernel, SDK, shells, and generic application framework do not import concrete portfolio providers.
 - [x] 8.2 Add no-direct-provider-call tests proving all callable operations traverse descriptor-owned service registration and typed service commands.
-- [ ] 8.3 Add canonical execution-path tests covering read-only, analytics, report, intent, denied, unavailable, unsupported, conflict, quota, and stale-data paths.
-- [ ] 8.4 Add provider replacement tests for built-in, plugin, remote, mock, and unavailable providers.
-- [ ] 8.5 Add file-size and module-ownership checks for any new implementation files.
+- [x] 8.3 Add canonical execution-path tests covering read-only, analytics, report, intent, denied, unavailable, unsupported, conflict, quota, and stale-data paths.
+- [x] 8.4 Add provider replacement tests for built-in, plugin, remote, mock, and unavailable providers.
+- [x] 8.5 Add file-size and module-ownership checks for any new implementation files.
 - [x] 8.6 Run `openspec validate add-pack-finance-portfolio --strict`.
-- [ ] 8.7 Run targeted cargo checks/tests, dependency-boundary gates, audit replay checks, and redaction checks before marking the implementation tasks complete.
+- [x] 8.7 Run targeted cargo checks/tests, dependency-boundary gates, audit replay checks, and redaction checks before marking the implementation tasks complete.
