@@ -18,6 +18,7 @@ use super::workflow_schedule::{
     ScheduleBackfillRequest, ScheduleRecurrence, ScheduleTimezonePolicy, ScheduleTriggerRecord,
     WorkflowSchedule, WorkflowScheduleSpec, WorkflowScheduleState,
 };
+use crate::audit_redaction;
 
 const MAX_REFERENCE: usize = 256;
 const MAX_PAGE_SIZE: u32 = 256;
@@ -384,24 +385,14 @@ pub fn filtered_schedule_page(
 pub fn redacted_schedule_metadata(metadata: &BTreeMap<String, String>) -> BTreeMap<String, String> {
     metadata
         .iter()
-        .filter(|(key, value)| bounded(key) && bounded(value) && !is_sensitive_key(key))
+        .filter(|(key, value)| {
+            bounded(key)
+                && bounded(value)
+                && !audit_redaction::is_sensitive_json_key(key)
+                && !key.to_ascii_lowercase().contains("provider")
+        })
         .map(|(key, value)| (key.clone(), format!("ref:{}", workflow_stable_hash(value))))
         .collect()
-}
-
-fn is_sensitive_key(key: &str) -> bool {
-    let normalized = key.to_ascii_lowercase();
-    [
-        "payload",
-        "prompt",
-        "secret",
-        "credential",
-        "token",
-        "private",
-        "provider",
-    ]
-    .iter()
-    .any(|part| normalized.contains(part))
 }
 
 fn bounded(value: &str) -> bool {
