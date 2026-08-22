@@ -227,17 +227,21 @@ impl SystemService for DeviceCameraSystemServiceProvider {
 /// Map provider-neutral commands to the stable, sanitized camera audit taxonomy.
 fn camera_success_event(operation: &str) -> &'static str {
     match operation {
-        "camera.inspect_authorization" | "camera.request_authorization" => {
-            "camera.authorization_requested"
-        }
+        "camera.inspect_authorization" => "camera.authorization_inspected",
+        "camera.request_authorization" => "camera.authorization_requested",
+        "camera.list_devices" => "camera.devices_listed",
+        "camera.inspect_device" => "camera.device_inspected",
         "camera.open_session" => "camera.session_opened",
         "camera.start_preview" => "camera.preview_started",
+        "camera.stop_preview" => "camera.preview_stopped",
         "camera.capture_photo" => "camera.photo_captured",
         "camera.start_recording" => "camera.recording_started",
         "camera.stop_recording" => "camera.recording_stopped",
         "camera.read_frame" => "camera.frame_reference_created",
         "camera.set_controls" => "camera.controls_changed",
+        "camera.inspect_controls" => "camera.controls_inspected",
         "camera.close_session" => "camera.session_closed",
+        "camera.inspect_host" => "camera.host_inspected",
         _ => "camera.command_completed",
     }
 }
