@@ -1,0 +1,23 @@
+/// Sanitized crypto read events for trace, audit, and replay.
+pub const FINANCE_CRYPTO_TRACE_EVENTS: &[&str] = &[
+    "crypto_pack_declared",
+    "crypto_admission_validated",
+    "crypto_provider_inspected",
+    "crypto_assets_searched",
+    "crypto_asset_read",
+    "crypto_token_reference_read",
+    "crypto_market_pairs_searched",
+    "crypto_quote_read",
+    "crypto_trade_read",
+    "crypto_bars_read",
+    "crypto_snapshot_read",
+    "crypto_supply_read",
+    "crypto_market_status_read",
+    "crypto_public_address_diagnostics",
+    "crypto_freshness_inspected",
+    "crypto_artifact_handle_issued",
+    "crypto_policy_decision",
+    "crypto_entitlement_checked",
+    "crypto_unavailable",
+    "crypto_snapshot_recorded",
+];

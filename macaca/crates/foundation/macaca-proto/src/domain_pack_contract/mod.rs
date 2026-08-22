@@ -94,6 +94,8 @@ mod finance_accounting_reports;
 mod finance_accounting_validation_permissions;
 pub mod finance_common;
 pub mod finance_crypto;
+mod finance_crypto_trace;
+mod finance_crypto_validation_permissions;
 pub mod finance_invoice;
 mod finance_invoice_validation;
 pub mod finance_market_data;

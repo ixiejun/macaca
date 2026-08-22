@@ -212,6 +212,7 @@ pub use super::expansion::{
 pub use super::exports_foundation_filesystem::*;
 pub use super::finance_accounting_validation_permissions::validate_finance_accounting_permission_declarations;
 pub use super::finance_common::{FinanceCommandEnvelope, FinanceError, FinancePage};
+pub use super::finance_crypto_validation_permissions::validate_finance_crypto_permission_declarations;
 pub use super::foundation_config::{
     config_stable_hash, foundation_config_descriptor_hashes, foundation_config_pack_definition,
     ConfigDescribeSchemaCommand, ConfigDescriptorHashes, ConfigError,

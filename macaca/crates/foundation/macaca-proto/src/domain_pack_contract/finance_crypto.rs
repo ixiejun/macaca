@@ -26,6 +26,8 @@ pub const FINANCE_CRYPTO_COMMANDS: &[&str] = &[
     "crypto.inspect_freshness",
     "crypto.get_artifact_handle",
 ];
+
+pub use super::finance_crypto_trace::FINANCE_CRYPTO_TRACE_EVENTS;
 const CRYPTO_PERMISSION_SCOPES: &[&str] = &[
     "crypto.provider.inspect",
     "crypto.asset.search",
