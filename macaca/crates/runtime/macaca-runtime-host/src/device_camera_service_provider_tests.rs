@@ -25,7 +25,7 @@ async fn camera_commands_are_traceable_and_do_not_echo_frames_or_media() {
             .unwrap();
         assert_eq!(result.output["status"], "reference_only");
         assert!(!result.output.to_string().contains(marker));
-        let event = events.recv().await.unwrap();
+        let event = receive_outcome(&mut events, "completed").await;
         assert_eq!(event.outcome, "completed");
         assert!(event.command.starts_with("camera."));
         assert!(!event.replay_ref.contains(marker));
@@ -121,7 +121,7 @@ async fn host_rejections_do_not_complete_camera_work() {
             ))
             .await
             .is_err());
-        let event = events.recv().await.unwrap();
+        let event = receive_command(&mut events, "camera.policy_decision").await;
         assert_eq!(event.command, "camera.policy_decision");
         assert_eq!(event.outcome, "preflight_rejected");
     }
@@ -149,7 +149,7 @@ async fn canonical_camera_operations_emit_sanitized_audit_taxonomy() {
             ))
             .await
             .unwrap();
-        let event = events.recv().await.unwrap();
+        let event = receive_command(&mut events, expected_event).await;
         assert_eq!(event.command, expected_event);
         assert!(!event.replay_ref.contains("must-not-appear"));
     }
@@ -265,4 +265,62 @@ async fn camera_replay_reference_is_stable_after_provider_restart() {
     let event = events.recv().await.unwrap();
     assert_eq!(event.trace_id, trace_id);
     assert_eq!(event.replay_ref, format!("replay:camera:{trace_id}"));
+}
+
+async fn receive_outcome(
+    events: &mut tokio::sync::broadcast::Receiver<
+        super::device_camera_service_provider::CameraRuntimeEvent,
+    >,
+    expected: &str,
+) -> super::device_camera_service_provider::CameraRuntimeEvent {
+    loop {
+        let event = events.recv().await.unwrap();
+        if event.outcome == expected {
+            return event;
+        }
+    }
+}
+
+async fn receive_command(
+    events: &mut tokio::sync::broadcast::Receiver<
+        super::device_camera_service_provider::CameraRuntimeEvent,
+    >,
+    expected: &str,
+) -> super::device_camera_service_provider::CameraRuntimeEvent {
+    loop {
+        let event = events.recv().await.unwrap();
+        if event.command == expected {
+            return event;
+        }
+    }
+}
+
+#[tokio::test]
+async fn camera_emits_stable_pack_admission_and_policy_events() {
+    let provider = DeviceCameraSystemServiceProvider::mock();
+    let mut events = provider.subscribe();
+    provider.start().await.unwrap();
+    provider
+        .call(ServiceCommand::with_trace(
+            ServiceCommandName::new("camera.request_authorization"),
+            serde_json::json!({"raw_frame":"redacted"}),
+            TraceContext::new("camera-audit"),
+        ))
+        .await
+        .unwrap();
+    let mut names = Vec::new();
+    while let Ok(event) = events.try_recv() {
+        names.push(event.event_name);
+    }
+    for expected in [
+        "camera.pack_declared",
+        "camera.admission_validated",
+        "camera.policy_decision",
+        "camera.authorization_requested",
+    ] {
+        assert!(
+            names.iter().any(|name| name == expected),
+            "missing {expected}"
+        );
+    }
 }

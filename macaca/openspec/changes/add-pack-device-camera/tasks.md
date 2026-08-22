@@ -41,7 +41,7 @@
 
 ## 6. Trace, Audit, Replay, And Boundary Gates
 
-- [ ] 6.1 Emit sanitized `camera.pack_declared`, `camera.admission_validated`, `camera.policy_decision`, `camera.authorization_requested`, `camera.session_opened`, `camera.preview_started`, `camera.photo_captured`, `camera.recording_started`, `camera.recording_stopped`, `camera.frame_reference_created`, `camera.controls_changed`, `camera.session_closed`, `camera.session_revoked`, `camera.command_failed`, `camera.unavailable`, and `camera.snapshot_recorded` events.
+- [x] 6.1 Emit sanitized `camera.pack_declared`, `camera.admission_validated`, `camera.policy_decision`, `camera.authorization_requested`, `camera.session_opened`, `camera.preview_started`, `camera.photo_captured`, `camera.recording_started`, `camera.recording_stopped`, `camera.frame_reference_created`, `camera.controls_changed`, `camera.session_closed`, `camera.session_revoked`, `camera.command_failed`, `camera.unavailable`, and `camera.snapshot_recorded` events.
 - [x] 6.2 Add replay tests proving every command is trace-addressable through the canonical service path after refresh/restart without raw camera frames or raw media bytes.
 - [x] 6.3 Add dependency-boundary gates proving microkernel, SDK, shells, and generic application framework do not import concrete camera providers or host camera APIs.
 - [x] 6.4 Add no-direct-provider-call gates proving all camera commands enter through descriptor-owned service registrations and typed service runtime dispatch.

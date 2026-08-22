@@ -24,6 +24,8 @@ use crate::device_camera_service_state::CameraLifecycleLedger;
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct CameraRuntimeEvent {
     pub command: String,
+    /// Stable provider-neutral audit name; frame and device payloads are never retained.
+    pub event_name: String,
     pub trace_id: String,
     pub replay_ref: String,
     pub outcome: &'static str,
@@ -117,6 +119,7 @@ impl DeviceCameraSystemServiceProvider {
     fn emit(&self, event: &str, trace_id: &str, outcome: &'static str) {
         let _ = self.events.send(CameraRuntimeEvent {
             command: event.into(),
+            event_name: event.into(),
             trace_id: trace_id.into(),
             replay_ref: format!("replay:camera:{trace_id}"),
             outcome,
@@ -152,6 +155,7 @@ impl SystemService for DeviceCameraSystemServiceProvider {
     }
 
     async fn start(&self) -> ServiceResult<()> {
+        self.emit("camera.pack_declared", "lifecycle:camera", "pack_declared");
         info!(
             service_id = DEVICE_CAMERA_SERVICE_ID,
             "device camera provider started"
@@ -180,6 +184,16 @@ impl SystemService for DeviceCameraSystemServiceProvider {
             warn!(service_id = DEVICE_CAMERA_SERVICE_ID, command = operation, trace_id = %trace.trace_id, rejection = ?rejection, "device camera command rejected before adapter dispatch");
             return Err(preflight_error(rejection));
         }
+        for event_name in ["camera.admission_validated", "camera.policy_decision"] {
+            self.emit(event_name, &trace.trace_id, "validated");
+        }
+        if operation == "camera.request_authorization" {
+            self.emit(
+                "camera.authorization_requested",
+                &trace.trace_id,
+                "requested",
+            );
+        }
         self.lifecycle
             .record_completion(operation, &trace.trace_id)
             .await;
@@ -198,6 +212,7 @@ impl SystemService for DeviceCameraSystemServiceProvider {
 
     async fn stop(&self) -> ServiceResult<()> {
         self.lifecycle.clear().await;
+        self.emit("camera.session_revoked", "lifecycle:camera", "revoked");
         info!(
             service_id = DEVICE_CAMERA_SERVICE_ID,
             "device camera provider stopped and released resources"
@@ -206,6 +221,7 @@ impl SystemService for DeviceCameraSystemServiceProvider {
     }
     async fn cleanup(&self) -> ServiceResult<()> {
         self.lifecycle.clear().await;
+        self.emit("camera.session_revoked", "cleanup:camera", "revoked");
         info!(
             service_id = DEVICE_CAMERA_SERVICE_ID,
             "device camera provider cleanup released resources"
