@@ -37,11 +37,11 @@
 ## 4. Permission, Policy, Resource, Entitlement, And Approval
 
 - [x] 4.1 Add declaration validation for `identity.account.read`, `identity.account.create`, `identity.account.update`, `identity.account.lifecycle`, `identity.account.link_identity`, and `identity.account.audit_export`.
-- [ ] 4.2 Require policy decisions before every command and approval before account creation, disabling, suspension, deletion, recovery, linked identity changes, recovery reference changes, and retained audit exports.
-- [ ] 4.3 Require entitlement checks for provider access, schema support, create support, update support, lifecycle support, linked identity support, recovery reference support, audit export support, and tenant/provider scope access.
-- [ ] 4.4 Reserve and meter resources for account search, status sync, linked identity changes, audit export size, provider quotas, storage, and snapshots.
-- [ ] 4.5 Return typed denied/unavailable/unsupported/conflict/quota/stale-data outcomes before provider calls when preconditions fail.
-- [ ] 4.6 Add tests proving denied, unavailable, unsupported, conflict, quota, stale-data, and redaction paths do not call concrete providers when preconditions fail.
+- [x] 4.2 Require policy decisions before every command and approval before account creation, disabling, suspension, deletion, recovery, linked identity changes, recovery reference changes, and retained audit exports.
+- [x] 4.3 Require entitlement checks for provider access, schema support, create support, update support, lifecycle support, linked identity support, recovery reference support, audit export support, and tenant/provider scope access.
+- [x] 4.4 Reserve and meter resources for account search, status sync, linked identity changes, audit export size, provider quotas, storage, and snapshots.
+- [x] 4.5 Return typed denied/unavailable/unsupported/conflict/quota/stale-data outcomes before provider calls when preconditions fail.
+- [x] 4.6 Add tests proving denied, unavailable, unsupported, conflict, quota, stale-data, and redaction paths do not call concrete providers when preconditions fail.
 
 ## 5. Service Provider, Provider Strategy, And Unavailable Behavior
 
@@ -50,7 +50,7 @@
 - [ ] 5.3 Implement a mock provider with synthetic accounts, identifiers, lifecycle states, linked identities, recovery references, audit references, stale-data states, and configurable capability gaps.
 - [x] 5.4 Implement an unavailable provider that returns explicit unavailable diagnostics for every command without fake success.
 - [ ] 5.5 Normalize provider errors into Macaca result envelopes while preserving sanitized provider class, bounded code, retriable flag, lifecycle state, freshness, version conflict, and replay pointer.
-- [ ] 5.6 Add provider capability discovery for create/update/search support, lifecycle transitions, linked identity support, recovery reference support, audit export support, schema extension support, pagination, versioning, freshness, limits, attribution, and entitlement.
+- [x] 5.6 Add provider capability discovery for create/update/search support, lifecycle transitions, linked identity support, recovery reference support, audit export support, schema extension support, pagination, versioning, freshness, limits, attribution, and entitlement.
 
 ## 6. SDK, Admission, Examples, And Developer Documentation
 
@@ -66,15 +66,15 @@
 - [x] 7.1 Emit sanitized declaration, admission, provider-inspection, policy, entitlement, approval, resource, service-call, create-planning, lifecycle-planning, linked-identity-change, unavailable, health, snapshot, and result events.
 - [ ] 7.2 Add trace schemas for `account_pack_declared`, `account_pack_admission_validated`, `account_pack_policy_decision`, `account_pack_provider_inspected`, `account_pack_service_call_requested`, `account_pack_service_call_succeeded`, `account_pack_service_call_failed`, `account_pack_create_planned`, `account_pack_lifecycle_planned`, `account_pack_identity_link_changed`, `account_pack_unavailable`, and `account_pack_snapshot_recorded`.
 - [x] 7.3 Add replay tests proving every command is trace-addressable through the canonical service runtime path.
-- [ ] 7.4 Add snapshot tests proving descriptor, provider health, command availability, schema/lifecycle/link/audit support, policy-template hash, redaction profile, resource counters, freshness, and replay pointers are retained without raw payload leakage.
-- [ ] 7.5 Add redaction tests proving raw credentials, password hashes, reset tokens, recovery codes, MFA secrets, access tokens, refresh tokens, raw provider payloads, identity documents, and unbounded audit exports never enter logs, traces, snapshots, or SDK diagnostics.
-- [ ] 7.6 Add artifact-boundary tests proving audit exports are represented as bounded handles, hashes, and redacted metadata in observability surfaces.
+- [x] 7.4 Add snapshot tests proving descriptor, provider health, command availability, schema/lifecycle/link/audit support, policy-template hash, redaction profile, resource counters, freshness, and replay pointers are retained without raw payload leakage.
+- [x] 7.5 Add redaction tests proving raw credentials, password hashes, reset tokens, recovery codes, MFA secrets, access tokens, refresh tokens, raw provider payloads, identity documents, and unbounded audit exports never enter logs, traces, snapshots, or SDK diagnostics.
+- [x] 7.6 Add artifact-boundary tests proving audit exports are represented as bounded handles, hashes, and redacted metadata in observability surfaces.
 
 ## 8. Boundary, Quality, And Validation Gates
 
 - [x] 8.1 Add dependency gates proving kernel, SDK, shells, and generic application framework do not import concrete account providers.
 - [x] 8.2 Add no-direct-provider-call tests proving all callable operations traverse descriptor-owned service registration and typed service commands.
-- [ ] 8.3 Add canonical execution-path tests covering read-only, create, update, lifecycle transition, linked identity, status sync, recovery reference, audit export, denied, unavailable, unsupported, conflict, quota, stale-data, and redaction paths.
+- [x] 8.3 Add canonical execution-path tests covering read-only, create, update, lifecycle transition, linked identity, status sync, recovery reference, audit export, denied, unavailable, unsupported, conflict, quota, stale-data, and redaction paths.
 - [ ] 8.4 Add provider replacement tests for built-in, plugin, remote, mock, and unavailable providers.
 - [ ] 8.5 Add boundary tests proving account commands do not perform auth handoff, token exchange, credential storage, MFA challenge execution, profile preference management, organization membership changes, tenant policy changes, or application-specific workflows.
 - [x] 8.6 Add file-size and module-ownership checks for any new implementation files.

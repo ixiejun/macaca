@@ -90,6 +90,45 @@ async fn identity_account_provider_snapshot_is_bounded_and_cleanup_releases_refe
 }
 
 #[tokio::test]
+async fn identity_account_admission_denies_policy_facts_before_provider_state() {
+    let provider = IdentityAccountSystemServiceProvider::mock();
+    for (trace, payload) in [
+        ("policy", serde_json::json!({"policy_denied": true})),
+        (
+            "entitlement",
+            serde_json::json!({"entitlement_missing": true}),
+        ),
+        ("approval", serde_json::json!({"approval_required": true})),
+        ("permission", serde_json::json!({"permission_denied": true})),
+        ("stale", serde_json::json!({"stale_data": true})),
+    ] {
+        let result = provider
+            .call(ServiceCommand::with_trace(
+                ServiceCommandName::new("account.plan_update"),
+                payload,
+                TraceContext::new(trace),
+            ))
+            .await;
+        assert!(matches!(result, Err(ServiceError::DisabledByPolicy(_))));
+    }
+    assert_eq!(provider.snapshot().await["active_reference_count"], "0");
+}
+
+#[test]
+fn identity_account_capability_reports_unavailable_provider_class() {
+    let provider = IdentityAccountSystemServiceProvider::unavailable("module_absent");
+    assert_eq!(provider.capability().provider_class, "unavailable");
+    assert!(matches!(
+        provider.capability().state,
+        macaca_proto::DomainPackProviderCapabilityState::Unavailable
+    ));
+    assert_eq!(
+        provider.descriptor().metadata.get("provider_class"),
+        Some(&"unavailable".to_string())
+    );
+}
+
+#[tokio::test]
 async fn identity_account_commands_replay_through_the_canonical_service_runtime() {
     let events = Arc::new(InMemoryServiceRuntimeEventSink::new());
     let runtime = ServiceRuntime::new(ServiceRuntimeConfig {

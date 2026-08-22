@@ -83,7 +83,12 @@ impl IdentityAccountSystemServiceProvider {
     /// Return declarative feature facts rather than concrete directory details.
     pub fn capability(&self) -> AccountProviderCapability {
         AccountProviderCapability {
-            provider_class: "mock".into(),
+            provider_class: if self.unavailable_reason.is_some() {
+                "unavailable"
+            } else {
+                "mock"
+            }
+            .into(),
             feature_flags: IDENTITY_ACCOUNT_COMMANDS
                 .iter()
                 .map(|command| (*command).into())
@@ -97,7 +102,11 @@ impl IdentityAccountSystemServiceProvider {
                 ("max_page_size".into(), 100),
                 ("max_snapshot_items".into(), 100),
             ]),
-            state: DomainPackProviderCapabilityState::Preview,
+            state: if self.unavailable_reason.is_some() {
+                DomainPackProviderCapabilityState::Unavailable
+            } else {
+                DomainPackProviderCapabilityState::Preview
+            },
         }
     }
 
@@ -129,7 +138,11 @@ impl IdentityAccountSystemServiceProvider {
 #[async_trait]
 impl SystemService for IdentityAccountSystemServiceProvider {
     fn descriptor(&self) -> ServiceDescriptor {
-        self.descriptor.clone()
+        let mut descriptor = self.descriptor.clone();
+        descriptor
+            .metadata
+            .insert("provider_class".into(), self.capability().provider_class);
+        descriptor
     }
 
     async fn start(&self) -> ServiceResult<()> {
@@ -160,6 +173,18 @@ impl SystemService for IdentityAccountSystemServiceProvider {
         }
         if !IDENTITY_ACCOUNT_COMMANDS.contains(&command.name.as_str()) {
             return Err(ServiceError::UnsupportedCommand(command.name.to_string()));
+        }
+        if let Some(reason) = account_admission_denial(&command.payload) {
+            let _ = self.events.send(event(
+                "account.policy_decision",
+                &trace.trace_id,
+                IdentityAccountRuntimeEventKind::PolicyDecision,
+                "denied",
+            ));
+            return Err(ServiceError::DisabledByPolicy(reason.into()));
+        }
+        if self.handles.read().await.len() >= 100 {
+            return Err(ServiceError::DisabledByPolicy("quota_exceeded".into()));
         }
 
         let handle_ref = format!("account:reference:{}", trace.trace_id);
@@ -222,6 +247,25 @@ impl SystemService for IdentityAccountSystemServiceProvider {
         ));
         Ok(health)
     }
+}
+
+/// Evaluate opaque host-issued policy facts before retaining account references.
+fn account_admission_denial(payload: &serde_json::Value) -> Option<&'static str> {
+    let blocked = |key: &str, reason: &'static str| {
+        (payload.get(key).and_then(serde_json::Value::as_bool) == Some(true)).then_some(reason)
+    };
+    blocked("policy_denied", "policy_denied")
+        .or_else(|| blocked("entitlement_missing", "entitlement_missing"))
+        .or_else(|| blocked("approval_required", "approval_required"))
+        .or_else(|| blocked("permission_denied", "permission_denied"))
+        .or_else(|| blocked("lifecycle_unsupported", "lifecycle_unsupported"))
+        .or_else(|| blocked("linked_identity_denied", "linked_identity_denied"))
+        .or_else(|| blocked("recovery_denied", "recovery_reference_denied"))
+        .or_else(|| blocked("audit_export_denied", "audit_export_denied"))
+        .or_else(|| blocked("stale_data", "stale_data"))
+        .or_else(|| blocked("quota_exceeded", "quota_exceeded"))
+        .or_else(|| blocked("timeout", "timeout"))
+        .or_else(|| blocked("cancelled", "cancelled"))
 }
 
 /// Build the runtime descriptor entirely from proto-owned contract constants.
