@@ -205,6 +205,14 @@ impl SystemService for MediaTranscriptionSystemServiceProvider {
             warn!(service_id = MEDIA_TRANSCRIPTION_SERVICE_ID, command = operation, trace_id = %trace.trace_id, rejection = ?rejection, "media transcription command rejected before provider dispatch");
             return Err(preflight_error(rejection));
         }
+        if let Some(reason) = transcription_payload_denial(operation, &command.payload) {
+            self.emit(
+                "transcription.policy_decision",
+                &trace.trace_id,
+                "payload_rejected",
+            );
+            return Err(ServiceError::DisabledByPolicy(reason.into()));
+        }
         if let Err(error) = TranscriptionSideEffectLedger::validate_source_version(&command) {
             self.emit(
                 "transcription.command_failed",
@@ -262,6 +270,35 @@ impl SystemService for MediaTranscriptionSystemServiceProvider {
                 }
             }))
     }
+}
+
+/// Validate provider-neutral policy facts before allocating stream/job state.
+/// The helper intentionally checks only bounded metadata and never reads audio
+/// or transcript content from a command payload.
+fn transcription_payload_denial(
+    operation: &str,
+    payload: &serde_json::Value,
+) -> Option<&'static str> {
+    let blocked = |key: &str, reason: &'static str| {
+        (payload.get(key).and_then(serde_json::Value::as_bool) == Some(true)).then_some(reason)
+    };
+    blocked("scope_denied", "scope_denied")
+        .or_else(|| blocked("format_unsupported", "format_unsupported"))
+        .or_else(|| blocked("language_unsupported", "language_unsupported"))
+        .or_else(|| blocked("model_unsupported", "model_unsupported"))
+        .or_else(|| blocked("redaction_denied", "redaction_denied"))
+        .or_else(|| blocked("translation_denied", "translation_denied"))
+        .or_else(|| blocked("approval_required", "approval_required"))
+        .or_else(|| blocked("timeout", "timeout"))
+        .or_else(|| blocked("cancelled", "cancelled"))
+        .or_else(|| {
+            (operation == "transcription.append_stream_chunk"
+                && payload
+                    .get("chunk_index")
+                    .and_then(serde_json::Value::as_u64)
+                    .is_some_and(|index| index > 1024))
+            .then_some("chunk_quota_exceeded")
+        })
 }
 
 /// Map lifecycle markers and commands to stable sanitized audit vocabulary.

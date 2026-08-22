@@ -189,6 +189,35 @@ async fn preflight_rejections_do_not_complete_provider_work() {
 }
 
 #[tokio::test]
+async fn payload_policy_rejections_fail_closed_before_transcription_work() {
+    let provider = MediaTranscriptionSystemServiceProvider::mock();
+    for (trace, payload) in [
+        ("scope", serde_json::json!({"scope_denied": true})),
+        ("format", serde_json::json!({"format_unsupported": true})),
+        (
+            "language",
+            serde_json::json!({"language_unsupported": true}),
+        ),
+        ("redaction", serde_json::json!({"redaction_denied": true})),
+        ("approval", serde_json::json!({"approval_required": true})),
+        ("timeout", serde_json::json!({"timeout": true})),
+    ] {
+        let result = provider
+            .call(ServiceCommand::with_trace(
+                ServiceCommandName::new("transcription.batch_request"),
+                payload,
+                TraceContext::new(trace),
+            ))
+            .await;
+        assert!(matches!(result, Err(ServiceError::DisabledByPolicy(_))));
+    }
+    assert_eq!(
+        provider.snapshot().await["idempotency_completion_count"],
+        "0"
+    );
+}
+
+#[tokio::test]
 async fn host_issued_rejections_never_complete_or_observe_transcription_payloads() {
     let rejected = [
         TranscriptionPreflightFacts {
