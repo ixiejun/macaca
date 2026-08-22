@@ -2,7 +2,10 @@ use macaca_kernel::SystemService;
 use macaca_proto::device_local_files::DEVICE_LOCAL_FILES_COMMANDS;
 use macaca_proto::{ServiceCommand, ServiceCommandName, ServiceError, ServiceHealth, TraceContext};
 
-use super::device_local_files_service_provider::DeviceLocalFilesSystemServiceProvider;
+use super::device_local_files_service_provider::{
+    transition_local_file_grant, transition_local_file_transfer,
+    DeviceLocalFilesSystemServiceProvider, LocalFileGrantState, LocalFileTransferState,
+};
 
 #[tokio::test]
 async fn local_file_commands_are_reference_only_and_redacted() {
@@ -85,6 +88,38 @@ async fn local_files_replay_reference_is_stable_after_provider_restart() {
     let event = events.recv().await.unwrap();
     assert_eq!(event.trace_id, trace_id);
     assert_eq!(event.replay_ref, format!("replay:local-files:{trace_id}"));
+}
+
+#[test]
+fn local_files_grant_and_transfer_state_machines_fail_closed() {
+    assert_eq!(
+        transition_local_file_grant(LocalFileGrantState::Requested, "grant"),
+        Some(LocalFileGrantState::Granted)
+    );
+    assert_eq!(
+        transition_local_file_grant(LocalFileGrantState::Granted, "activate"),
+        Some(LocalFileGrantState::Active)
+    );
+    assert_eq!(
+        transition_local_file_grant(LocalFileGrantState::Active, "revoke"),
+        Some(LocalFileGrantState::Revoked)
+    );
+    assert_eq!(
+        transition_local_file_grant(LocalFileGrantState::Revoked, "activate"),
+        None
+    );
+    assert_eq!(
+        transition_local_file_transfer(LocalFileTransferState::Requested, "start"),
+        Some(LocalFileTransferState::Active)
+    );
+    assert_eq!(
+        transition_local_file_transfer(LocalFileTransferState::Active, "complete"),
+        Some(LocalFileTransferState::Completed)
+    );
+    assert_eq!(
+        transition_local_file_transfer(LocalFileTransferState::Completed, "cancel"),
+        None
+    );
 }
 
 #[tokio::test]

@@ -26,7 +26,7 @@
 
 - [x] 4.1 Implement the device local file service provider contract behind the service runtime; do not construct providers from kernel, SDK, shells, or generic application-framework code.
 - [x] 4.2 Add provider descriptor support for host-native, browser, remote-host, plugin, mock, and unavailable provider classes.
-- [ ] 4.3 Add grant and transfer state machines covering requested, granted, active, completed, cancelled, expired, revoked, failed, and unavailable states.
+- [x] 4.3 Add grant and transfer state machines covering requested, granted, active, completed, cancelled, expired, revoked, failed, and unavailable states.
 - [x] 4.4 Add mock and unavailable providers for deterministic tests; external or host-specific adapters must remain optional providers or plugin/remote modules.
 - [ ] 4.5 Add provider conformance tests for picker commands, handle inspection/list/revoke, read/write/append/truncate, import/export, directory listing, cancellation, redaction, and unsupported-command reporting.
 - [ ] 4.6 Add lifecycle, health, snapshot, shutdown, timeout, cancellation, backpressure, partial transfer, content scanning, resource cleanup, and bounded output behavior.

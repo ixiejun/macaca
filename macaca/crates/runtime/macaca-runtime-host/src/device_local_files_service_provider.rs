@@ -28,6 +28,60 @@ pub struct LocalFilesRuntimeEvent {
     pub outcome: &'static str,
 }
 
+/// Provider-neutral grant states used by picker/handle Strategies.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum LocalFileGrantState {
+    Requested,
+    Granted,
+    Active,
+    Revoked,
+    Expired,
+    Failed,
+    Unavailable,
+}
+
+/// Provider-neutral transfer states used by import/export Strategies.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum LocalFileTransferState {
+    Requested,
+    Active,
+    Completed,
+    Cancelled,
+    Failed,
+    Unavailable,
+}
+
+/// State-pattern transition for grants; invalid transitions fail closed.
+pub fn transition_local_file_grant(
+    state: LocalFileGrantState,
+    operation: &str,
+) -> Option<LocalFileGrantState> {
+    match (state, operation) {
+        (LocalFileGrantState::Requested, "grant") => Some(LocalFileGrantState::Granted),
+        (LocalFileGrantState::Granted, "activate") => Some(LocalFileGrantState::Active),
+        (LocalFileGrantState::Active, "revoke") => Some(LocalFileGrantState::Revoked),
+        (LocalFileGrantState::Active, "expire") => Some(LocalFileGrantState::Expired),
+        (_, "fail") => Some(LocalFileGrantState::Failed),
+        (_, "unavailable") => Some(LocalFileGrantState::Unavailable),
+        _ => None,
+    }
+}
+
+/// State-pattern transition for transfers; invalid transitions fail closed.
+pub fn transition_local_file_transfer(
+    state: LocalFileTransferState,
+    operation: &str,
+) -> Option<LocalFileTransferState> {
+    match (state, operation) {
+        (LocalFileTransferState::Requested, "start") => Some(LocalFileTransferState::Active),
+        (LocalFileTransferState::Active, "complete") => Some(LocalFileTransferState::Completed),
+        (LocalFileTransferState::Active, "cancel") => Some(LocalFileTransferState::Cancelled),
+        (_, "fail") => Some(LocalFileTransferState::Failed),
+        (_, "unavailable") => Some(LocalFileTransferState::Unavailable),
+        _ => None,
+    }
+}
+
 #[derive(Default)]
 struct LocalFilesLedger {
     handles: RwLock<usize>,
