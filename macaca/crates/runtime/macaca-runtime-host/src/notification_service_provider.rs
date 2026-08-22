@@ -23,6 +23,8 @@ use tracing::{info, warn};
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct NotificationRuntimeEvent {
     pub command: String,
+    /// Stable provider-neutral audit event name; payloads remain omitted.
+    pub event_name: String,
     pub trace_id: String,
     pub kind: NotificationRuntimeEventKind,
     pub delivery_status: NotificationDeliveryStatus,
@@ -324,9 +326,36 @@ fn event(
 ) -> NotificationRuntimeEvent {
     NotificationRuntimeEvent {
         command: command.into(),
+        event_name: notification_audit_event(command, kind).into(),
         trace_id: trace_id.into(),
         kind,
         delivery_status,
         replay_ref: format!("replay:{trace_id}"),
+    }
+}
+
+/// Map notification commands and lifecycle kinds to stable audit vocabulary.
+fn notification_audit_event(command: &str, kind: NotificationRuntimeEventKind) -> &'static str {
+    match (command, kind) {
+        (_, NotificationRuntimeEventKind::PackDeclared) => "notifications.pack_declared",
+        (_, NotificationRuntimeEventKind::AdmissionValidated) => {
+            "notifications.admission_validated"
+        }
+        (_, NotificationRuntimeEventKind::PolicyDecision) => "notifications.policy_decision",
+        ("notification.publish", _) => "notifications.notification_posted",
+        ("notification.schedule", _) => "notifications.notification_scheduled",
+        ("notification.cancel", _) => "notifications.notification_cancelled",
+        ("notification.register_action", _) => "notifications.interaction_received",
+        ("notification.register_subscription", _) => "notifications.interaction_received",
+        ("notification.update", _) => "notifications.notification_posted",
+        ("notification.acknowledge", _) => "notifications.interaction_received",
+        ("notification.dismiss", _) => "notifications.interaction_received",
+        ("notification.revoke_subscription", _) => "notifications.interaction_received",
+        ("notification.snapshot", NotificationRuntimeEventKind::SnapshotRecorded) => {
+            "notifications.snapshot_recorded"
+        }
+        (_, NotificationRuntimeEventKind::Unavailable) => "notifications.unavailable",
+        (_, NotificationRuntimeEventKind::HealthReported) => "notifications.health_reported",
+        _ => "notifications.command_completed",
     }
 }

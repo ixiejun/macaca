@@ -29,6 +29,7 @@ async fn notification_provider_is_deterministic_for_every_descriptor_command() {
             .unwrap();
         let event = receive_kind(&mut events, event_kind_for_command(command)).await;
         assert_eq!(event.command, *command);
+        assert!(event.event_name.starts_with("notifications."));
         assert!(!result.output.to_string().contains("must-not-leak"));
         assert!(!format!("{:?}", event).contains("must-not-leak"));
     }
@@ -36,6 +37,56 @@ async fn notification_provider_is_deterministic_for_every_descriptor_command() {
         provider.capability().supported_commands.len(),
         COMMUNICATION_NOTIFICATION_COMMANDS.len()
     );
+}
+
+#[tokio::test]
+async fn notification_commands_emit_stable_audit_event_names() {
+    let provider = NotificationSystemServiceProvider::mock();
+    let mut events = provider.subscribe();
+    for (command, expected) in [
+        ("notification.publish", "notifications.notification_posted"),
+        (
+            "notification.schedule",
+            "notifications.notification_scheduled",
+        ),
+        ("notification.update", "notifications.notification_posted"),
+        (
+            "notification.cancel",
+            "notifications.notification_cancelled",
+        ),
+        (
+            "notification.register_action",
+            "notifications.interaction_received",
+        ),
+        (
+            "notification.unregister_action",
+            "notifications.command_completed",
+        ),
+        (
+            "notification.acknowledge",
+            "notifications.interaction_received",
+        ),
+        ("notification.dismiss", "notifications.interaction_received"),
+        (
+            "notification.register_subscription",
+            "notifications.interaction_received",
+        ),
+        (
+            "notification.revoke_subscription",
+            "notifications.interaction_received",
+        ),
+    ] {
+        provider
+            .call(ServiceCommand::with_trace(
+                ServiceCommandName::new(command),
+                serde_json::json!({}),
+                TraceContext::new(command),
+            ))
+            .await
+            .unwrap();
+        let event = receive_kind(&mut events, event_kind_for_command(command)).await;
+        assert_eq!(event.event_name, expected);
+    }
 }
 
 #[tokio::test]
