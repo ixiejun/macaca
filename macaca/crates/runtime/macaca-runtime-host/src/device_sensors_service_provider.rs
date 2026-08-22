@@ -29,6 +29,35 @@ pub struct SensorRuntimeEvent {
     pub outcome: &'static str,
 }
 
+/// Provider-neutral stream lease lifecycle; invalid transitions fail closed.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum SensorLeaseState {
+    Requested,
+    Active,
+    Draining,
+    Closed,
+    Expired,
+    Revoked,
+    Failed,
+    Unavailable,
+}
+
+pub fn transition_sensor_lease(
+    state: SensorLeaseState,
+    operation: &str,
+) -> Option<SensorLeaseState> {
+    match (state, operation) {
+        (SensorLeaseState::Requested, "open") => Some(SensorLeaseState::Active),
+        (SensorLeaseState::Active, "drain") => Some(SensorLeaseState::Draining),
+        (SensorLeaseState::Active, "close") | (SensorLeaseState::Draining, "close") => {
+            Some(SensorLeaseState::Closed)
+        }
+        (SensorLeaseState::Active, "expire") => Some(SensorLeaseState::Expired),
+        (SensorLeaseState::Active, "revoke") => Some(SensorLeaseState::Revoked),
+        _ => None,
+    }
+}
+
 #[derive(Default)]
 struct SensorLedger {
     streams: RwLock<usize>,
@@ -168,6 +197,17 @@ impl SystemService for DeviceSensorsSystemServiceProvider {
             warn!(service_id = DEVICE_SENSORS_SERVICE_ID, command = operation, reason_code = %reason, "device sensors provider unavailable");
             return Err(ServiceError::ServiceUnavailable(reason.clone()));
         }
+        if let Some(reason) = sensor_admission_denial(&command.payload) {
+            self.emit("sensors.policy_decision", &trace.trace_id, "denied");
+            return Err(ServiceError::DisabledByPolicy(reason.into()));
+        }
+        let (streams, leases) = self.ledger.counts().await;
+        if (operation == "sensors.open_stream" && streams >= 32)
+            || (operation == "sensors.acquire_lease" && leases >= 32)
+        {
+            self.emit("sensors.policy_decision", &trace.trace_id, "quota_exceeded");
+            return Err(ServiceError::DisabledByPolicy("quota_exceeded".into()));
+        }
         for event_name in [
             "sensors.admission_validated",
             "sensors.policy_decision",
@@ -219,6 +259,34 @@ impl SystemService for DeviceSensorsSystemServiceProvider {
                 }
             }))
     }
+}
+
+fn sensor_admission_denial(payload: &serde_json::Value) -> Option<&'static str> {
+    let blocked = |key: &str, reason: &'static str| {
+        (payload.get(key).and_then(serde_json::Value::as_bool) == Some(true)).then_some(reason)
+    };
+    blocked("permission_denied", "permission_denied")
+        .or_else(|| blocked("disabled", "disabled"))
+        .or_else(|| blocked("foreground_required", "foreground_required"))
+        .or_else(|| blocked("sensitive_sensor", "sensitive_sensor_approval_required"))
+        .or_else(|| blocked("background_denied", "background_denied"))
+        .or_else(|| blocked("lease_revoked", "lease_revoked"))
+        .or_else(|| blocked("quota_exceeded", "quota_exceeded"))
+        .or_else(|| blocked("cancelled", "cancelled"))
+        .or_else(|| {
+            (payload
+                .get("frequency_hz")
+                .and_then(serde_json::Value::as_u64)
+                .is_some_and(|frequency| frequency > 100))
+            .then_some("frequency_limit_exceeded")
+        })
+        .or_else(|| {
+            (payload
+                .get("sample_count")
+                .and_then(serde_json::Value::as_u64)
+                .is_some_and(|count| count > 1024))
+            .then_some("sample_quota_exceeded")
+        })
 }
 
 fn sensor_success_event(operation: &str) -> &'static str {

@@ -2,7 +2,9 @@ use macaca_kernel::SystemService;
 use macaca_proto::device_sensors::DEVICE_SENSORS_COMMANDS;
 use macaca_proto::{ServiceCommand, ServiceCommandName, ServiceError, ServiceHealth, TraceContext};
 
-use super::device_sensors_service_provider::DeviceSensorsSystemServiceProvider;
+use super::device_sensors_service_provider::{
+    transition_sensor_lease, DeviceSensorsSystemServiceProvider, SensorLeaseState,
+};
 
 #[tokio::test]
 async fn sensor_commands_are_reference_only_and_redacted() {
@@ -120,4 +122,81 @@ async fn sensors_emit_stable_audit_event_taxonomy() {
             "missing {expected}"
         );
     }
+}
+
+#[tokio::test]
+async fn sensors_admission_denies_policy_facts_before_stream_allocation() {
+    let provider = DeviceSensorsSystemServiceProvider::mock();
+    for (trace, payload) in [
+        ("permission", serde_json::json!({"permission_denied": true})),
+        (
+            "foreground",
+            serde_json::json!({"foreground_required": true}),
+        ),
+        ("background", serde_json::json!({"background_denied": true})),
+        ("sensitive", serde_json::json!({"sensitive_sensor": true})),
+        ("frequency", serde_json::json!({"frequency_hz": 101})),
+        ("samples", serde_json::json!({"sample_count": 1025})),
+    ] {
+        let result = provider
+            .call(ServiceCommand::with_trace(
+                ServiceCommandName::new("sensors.open_stream"),
+                payload,
+                TraceContext::new(trace),
+            ))
+            .await;
+        assert!(matches!(result, Err(ServiceError::DisabledByPolicy(_))));
+    }
+    assert_eq!(provider.snapshot().await["active_stream_count"], "0");
+}
+
+#[tokio::test]
+async fn sensors_bound_streams_and_fail_closed_on_cancellation() {
+    let provider = DeviceSensorsSystemServiceProvider::mock();
+    for index in 0..32 {
+        provider
+            .call(ServiceCommand::with_trace(
+                ServiceCommandName::new("sensors.open_stream"),
+                serde_json::json!({}),
+                TraceContext::new(format!("stream-{index}")),
+            ))
+            .await
+            .unwrap();
+    }
+    let bounded = provider
+        .call(ServiceCommand::with_trace(
+            ServiceCommandName::new("sensors.open_stream"),
+            serde_json::json!({}),
+            TraceContext::new("stream-overflow"),
+        ))
+        .await;
+    assert!(matches!(bounded, Err(ServiceError::DisabledByPolicy(_))));
+    let cancelled = provider
+        .call(ServiceCommand::with_trace(
+            ServiceCommandName::new("sensors.read_stream"),
+            serde_json::json!({"cancelled": true}),
+            TraceContext::new("cancelled"),
+        ))
+        .await;
+    assert!(matches!(cancelled, Err(ServiceError::DisabledByPolicy(_))));
+}
+
+#[test]
+fn sensor_lease_transitions_fail_closed() {
+    assert_eq!(
+        transition_sensor_lease(SensorLeaseState::Requested, "open"),
+        Some(SensorLeaseState::Active)
+    );
+    assert_eq!(
+        transition_sensor_lease(SensorLeaseState::Active, "drain"),
+        Some(SensorLeaseState::Draining)
+    );
+    assert_eq!(
+        transition_sensor_lease(SensorLeaseState::Draining, "close"),
+        Some(SensorLeaseState::Closed)
+    );
+    assert_eq!(
+        transition_sensor_lease(SensorLeaseState::Closed, "open"),
+        None
+    );
 }

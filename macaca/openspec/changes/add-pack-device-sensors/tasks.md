@@ -16,20 +16,20 @@
 ## 3. Permission, Policy, Resource, Entitlement, And Approval
 
 - [x] 3.1 Implement declaration validation for `device.sensors.read`, `device.sensors.stream`, `device.sensors.calibration.read`, and `device.sensors.lease.manage`.
-- [ ] 3.2 Enforce sensor type, privacy class, frequency, sample count, stream duration, foreground/background, host permission, and retention policies before dispatch.
+- [x] 3.2 Enforce sensor type, privacy class, frequency, sample count, stream duration, foreground/background, host permission, and retention policies before dispatch.
 - [x] 3.3 Require stream commands to declare max duration, max sample count, frequency, delivery mode, cancellation behavior, and revocation behavior.
-- [ ] 3.4 Add resource reservation and quota checks for active leases, stream frequency, batch size, event buffer, CPU, memory, retained snapshots, and replay metadata.
-- [ ] 3.5 Add approval behavior for high-frequency motion streams, background access, host permission prompts, remote sensor forwarding, and sensitive environmental sensors.
-- [ ] 3.6 Add tests proving denied, unavailable, disabled, foreground-required, lease-revoked, and quota paths do not call concrete providers or leak resources.
+- [x] 3.4 Add resource reservation and quota checks for active leases, stream frequency, batch size, event buffer, CPU, memory, retained snapshots, and replay metadata.
+- [x] 3.5 Add approval behavior for high-frequency motion streams, background access, host permission prompts, remote sensor forwarding, and sensitive environmental sensors.
+- [x] 3.6 Add tests proving denied, unavailable, disabled, foreground-required, lease-revoked, and quota paths do not call concrete providers or leak resources.
 
 ## 4. Service Provider And Stream Lease Strategy
 
 - [x] 4.1 Implement the device sensor service provider contract behind the service runtime; do not construct providers from kernel, SDK, shells, or generic application-framework code.
 - [x] 4.2 Add provider descriptor support for host-native, browser, remote, plugin, mock, and unavailable provider classes.
-- [ ] 4.3 Add a stream lease state machine covering requested, active, draining, closed, expired, revoked, failed, and unavailable states.
+- [x] 4.3 Add a stream lease state machine covering requested, active, draining, closed, expired, revoked, failed, and unavailable states.
 - [x] 4.4 Add mock and unavailable providers for deterministic tests; external or host-specific adapters must remain optional providers or plugin/remote modules.
-- [ ] 4.5 Add provider conformance tests for list, inspect, one-shot read, stream open/read/close, batch read, calibration inspection, lease acquire/release, host inspection, revocation, redaction, and unsupported-command reporting.
-- [ ] 4.6 Add lifecycle, health, snapshot, shutdown, timeout, cancellation, backpressure, dropped-sample reporting, resource cleanup, and bounded output behavior.
+- [x] 4.5 Add provider conformance tests for list, inspect, one-shot read, stream open/read/close, batch read, calibration inspection, lease acquire/release, host inspection, revocation, redaction, and unsupported-command reporting.
+- [x] 4.6 Add lifecycle, health, snapshot, shutdown, timeout, cancellation, backpressure, dropped-sample reporting, resource cleanup, and bounded output behavior.
 
 ## 5. SDK, Admission, Examples, And ABI
 
