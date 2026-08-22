@@ -33,6 +33,33 @@ pub const DEVELOPER_REPOSITORY_COMMANDS: &[&str] = &[
     "repository.inspect_provider",
 ];
 
+/// Sanitized repository lifecycle events used for trace, audit, and replay.
+pub const DEVELOPER_REPOSITORY_TRACE_EVENTS: &[&str] = &[
+    "repository_pack_declared",
+    "repository_admission_validated",
+    "repository_opened",
+    "repository_inspected",
+    "repository_status_read",
+    "repository_refs_listed",
+    "repository_history_inspected",
+    "repository_diff_inspected",
+    "repository_changes_staged",
+    "repository_commit_planned",
+    "repository_commit_requested",
+    "repository_remotes_listed",
+    "repository_fetched",
+    "repository_pull_planned",
+    "repository_push_planned",
+    "repository_push_requested",
+    "repository_merge_planned",
+    "repository_mutation_validated",
+    "repository_remote_metadata_inspected",
+    "repository_provider_inspected",
+    "repository_policy_decision",
+    "repository_unavailable",
+    "repository_snapshot_recorded",
+];
+
 const REPOSITORY_PERMISSION_SCOPES: &[&str] = &[
     "repository.local.read",
     "repository.local.write",

@@ -72,6 +72,8 @@ pub mod developer_design_tools_service_provider;
 pub mod developer_design_tools_strategy;
 pub mod developer_issue_tracker_service_provider;
 pub mod developer_issue_tracker_strategy;
+pub mod developer_repository_service_provider;
+pub mod developer_repository_strategy;
 pub mod device_camera_service_provider;
 mod device_camera_service_state;
 pub mod device_host_lifecycle_service_provider;
@@ -313,6 +315,7 @@ mod developer_ci_service_provider_tests;
 mod developer_code_service_provider_tests;
 mod developer_design_tools_service_provider_tests;
 mod developer_issue_tracker_service_provider_tests;
+mod developer_repository_service_provider_tests;
 #[cfg(test)]
 mod diagnostics_realtime_remote_service_provider_tests;
 #[cfg(test)]

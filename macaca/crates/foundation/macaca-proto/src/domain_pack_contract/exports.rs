@@ -192,6 +192,7 @@ pub use super::developer_ci_validation_permissions::validate_developer_ci_permis
 pub use super::developer_code_validation_permissions::validate_developer_code_permission_declarations;
 pub use super::developer_design_tools_validation_permissions::validate_developer_design_tools_permission_declarations;
 pub use super::developer_issue_tracker_validation_permissions::validate_developer_issue_tracker_permission_declarations;
+pub use super::developer_repository_validation_permissions::validate_developer_repository_permission_declarations;
 pub use super::device_camera_preflight::{
     admit_camera_operation, transition_camera_session, CameraPreflightFacts,
     CameraPreflightFailure, CameraSessionAction, CameraSessionState,
@@ -491,10 +492,4 @@ pub use super::workflow_review_semantics::{
     ReviewFindingV1, ReviewGateRaceResult, ReviewLifecycleSpec, ReviewLifecycleState,
     ReviewOutcomeV1, ReviewRequestV1, ReviewRevisionPolicy, ReviewRevisionSpec, ReviewRoundV1,
 };
-pub use super::workflow_schedule_semantics::{
-    approval_required, derive_idempotency_key, filtered_schedule_page, preflight_schedule,
-    redacted_schedule_metadata, reserve_resources, transition_schedule, trigger_evidence,
-    trigger_record, validate_misfire, validate_overlap, validate_recurrence, validate_spec,
-    validate_timezone, ScheduleAdmissionFailure, ScheduleApprovalEvidence, SchedulePolicyContext,
-    ScheduleResourceLimits, ScheduleResourceReservation, ScheduleTriggerEvidence,
-};
+pub use super::workflow_schedule_semantics::*;
