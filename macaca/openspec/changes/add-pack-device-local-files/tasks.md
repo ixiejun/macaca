@@ -20,7 +20,7 @@
 - [x] 3.3 Require explicit `LocalFileWritePlan` for write, append, truncate, export, and overwrite operations.
 - [ ] 3.4 Add resource reservation and quota checks for active grants, active transfers, bytes, chunks, directory entry count, traversal depth, memory, storage, retained snapshots, and replay metadata.
 - [ ] 3.5 Add approval behavior for directory grants, destructive operations, large exports/imports, delegated/remote host file access, and sensitive file categories.
-- [ ] 3.6 Add tests proving denied, unavailable, foreground-required, grant-expired, revoked, destructive-denied, directory-denied, content-scan-blocked, and quota paths do not call concrete providers or leak resources.
+- [x] 3.6 Add tests proving denied, unavailable, foreground-required, grant-expired, revoked, destructive-denied, directory-denied, content-scan-blocked, and quota paths do not call concrete providers or leak resources.
 
 ## 4. Service Provider, Grant, And Transfer Strategy
 
@@ -28,7 +28,7 @@
 - [x] 4.2 Add provider descriptor support for host-native, browser, remote-host, plugin, mock, and unavailable provider classes.
 - [x] 4.3 Add grant and transfer state machines covering requested, granted, active, completed, cancelled, expired, revoked, failed, and unavailable states.
 - [x] 4.4 Add mock and unavailable providers for deterministic tests; external or host-specific adapters must remain optional providers or plugin/remote modules.
-- [ ] 4.5 Add provider conformance tests for picker commands, handle inspection/list/revoke, read/write/append/truncate, import/export, directory listing, cancellation, redaction, and unsupported-command reporting.
+- [x] 4.5 Add provider conformance tests for picker commands, handle inspection/list/revoke, read/write/append/truncate, import/export, directory listing, cancellation, redaction, and unsupported-command reporting.
 - [ ] 4.6 Add lifecycle, health, snapshot, shutdown, timeout, cancellation, backpressure, partial transfer, content scanning, resource cleanup, and bounded output behavior.
 
 ## 5. SDK, Admission, Examples, And ABI

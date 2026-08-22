@@ -164,3 +164,68 @@ async fn local_files_emits_stable_audit_event_taxonomy() {
         );
     }
 }
+
+#[tokio::test]
+async fn local_files_admission_denies_policy_facts_before_resource_allocation() {
+    let provider = DeviceLocalFilesSystemServiceProvider::mock();
+    for (trace, payload) in [
+        (
+            "permission",
+            serde_json::json!({"permission_granted": false}),
+        ),
+        (
+            "foreground",
+            serde_json::json!({"foreground_required": true}),
+        ),
+        (
+            "traversal",
+            serde_json::json!({"directory_traversal": true}),
+        ),
+        ("scan", serde_json::json!({"content_scan_blocked": true})),
+        ("quota", serde_json::json!({"quota_exceeded": true})),
+        (
+            "approval",
+            serde_json::json!({"approval_required": true, "approved": false}),
+        ),
+    ] {
+        let result = provider
+            .call(ServiceCommand::with_trace(
+                ServiceCommandName::new("local_files.request_directory_handle"),
+                payload,
+                TraceContext::new(trace),
+            ))
+            .await;
+        assert!(matches!(result, Err(ServiceError::DisabledByPolicy(_))));
+    }
+    assert_eq!(provider.snapshot().await["active_handle_count"], "0");
+}
+
+#[tokio::test]
+async fn local_files_rejects_expired_and_revoked_grants_without_allocating() {
+    let provider = DeviceLocalFilesSystemServiceProvider::mock();
+    for state in ["expired", "revoked"] {
+        let result = provider
+            .call(ServiceCommand::with_trace(
+                ServiceCommandName::new("local_files.read"),
+                serde_json::json!({"grant_state": state}),
+                TraceContext::new(state),
+            ))
+            .await;
+        assert!(matches!(result, Err(ServiceError::DisabledByPolicy(_))));
+    }
+    assert_eq!(provider.snapshot().await["active_transfer_count"], "0");
+}
+
+#[tokio::test]
+async fn local_files_reports_unsupported_commands_without_provider_calls() {
+    let provider = DeviceLocalFilesSystemServiceProvider::mock();
+    let result = provider
+        .call(ServiceCommand::with_trace(
+            ServiceCommandName::new("local_files.unknown"),
+            serde_json::json!({}),
+            TraceContext::new("unsupported"),
+        ))
+        .await;
+    assert!(matches!(result, Err(ServiceError::UnsupportedCommand(_))));
+    assert_eq!(provider.snapshot().await["active_handle_count"], "0");
+}
