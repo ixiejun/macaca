@@ -34,7 +34,7 @@
 ## 5. SDK, Admission, Examples, And ABI
 
 - [x] 5.1 Extend SDK discovery for `pack.device.camera.v1` with command schemas, DTO schemas, permission scopes, examples, availability, authorization state, device descriptors, output limits, control support, privacy indicator support, diagnostics, compatibility, and documentation URL.
-- [ ] 5.2 Extend application admission so required declarations block when unavailable/disabled and optional declarations degrade explicitly with effective capability mementos.
+- [x] 5.2 Extend application admission so required declarations block when unavailable/disabled and optional declarations degrade explicitly with effective capability mementos.
 - [x] 5.3 Add SDK command helper builders that only produce canonical traced service calls and never construct providers or branch on host/platform/camera-model names.
 - [x] 5.4 Add WASM/application ABI exposure for camera commands using provider-neutral DTO schemas and canonical service-call dispatch.
 - [x] 5.5 Add generic examples for authorization, device listing, preview, photo capture, video recording, frame reference, controls, close/revoke, and unavailable-provider diagnostics.

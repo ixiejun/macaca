@@ -34,7 +34,7 @@
 ## 5. SDK, Admission, Examples, And ABI
 
 - [x] 5.1 Extend SDK discovery for `pack.device.foreground_background_host.v1` with command schemas, DTO schemas, permission scopes, examples, availability, host state, supported foreground presentations, supported background lease classes, throttling metadata, diagnostics, compatibility, and documentation URL.
-- [ ] 5.2 Extend application admission so required declarations block when unavailable/disabled and optional declarations degrade explicitly with effective capability mementos.
+- [x] 5.2 Extend application admission so required declarations block when unavailable/disabled and optional declarations degrade explicitly with effective capability mementos.
 - [x] 5.3 Add SDK command helper builders that only produce canonical traced service calls and never construct providers or branch on host/platform/service-type names.
 - [x] 5.4 Add WASM/application ABI exposure for host lifecycle commands using provider-neutral DTO schemas and canonical service-call dispatch.
 - [x] 5.5 Add generic examples for state inspection, event subscription, foreground session, background lease, policy inspection, revocation, throttling, and unavailable-provider diagnostics.
