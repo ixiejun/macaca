@@ -11,6 +11,26 @@ use super::model::{DomainPackDefinition, DomainPackProviderCapabilityState};
 pub const MEDIA_AUDIO_PACK_ID: &str = "pack.media.audio.v1";
 pub const MEDIA_AUDIO_SERVICE_ID: &str = "service.media.audio";
 
+/// Stable sanitized trace taxonomy for audio declaration, calls, and replay.
+pub const MEDIA_AUDIO_TRACE_EVENTS: &[&str] = &[
+    "audio_pack_declared",
+    "audio_pack_admission_validated",
+    "audio_pack_policy_decision",
+    "audio_pack_provider_inspected",
+    "audio_pack_service_call_requested",
+    "audio_pack_service_call_succeeded",
+    "audio_pack_service_call_failed",
+    "audio_pack_import_planned",
+    "audio_pack_transcode_planned",
+    "audio_pack_segment_planned",
+    "audio_pack_filter_planned",
+    "audio_pack_mix_planned",
+    "audio_pack_synthesis_planned",
+    "audio_pack_export_planned",
+    "audio_pack_unavailable",
+    "audio_pack_snapshot_recorded",
+];
+
 pub const MEDIA_AUDIO_COMMANDS: &[&str] = &[
     "audio.inspect_provider",
     "audio.import_audio_request",

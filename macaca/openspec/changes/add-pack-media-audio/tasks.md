@@ -23,11 +23,11 @@
 
 - [x] 3.1 Implement manifest declaration validation for required and optional `pack.media.audio.v1` declarations.
 - [x] 3.2 Implement permission validation for `audio.provider.inspect`, `audio.import`, `audio.open`, `audio.metadata.read`, `audio.waveform.read`, `audio.transcode`, `audio.segment`, `audio.filter`, `audio.mix`, `audio.synthesize`, `audio.export`, and `audio.artifact.read`.
-- [ ] 3.3 Implement provider/audio/artifact/segment/mix/prompt/voice/export scope checks for declared audio, private recordings, voice-sensitive assets, generated audio, denied scopes, stale handles, and external delivery.
-- [ ] 3.4 Implement policy checks for format/codec/container support, duration, sample rate, channel layout, loudness/waveform projection limits, metadata stripping, segment ranges, filter graph compatibility, mix source rights/consent, prompt redaction, voice consent/safety, generated-voice provenance, export format/quality policy, artifact retention, and output redaction.
-- [ ] 3.5 Implement resource reservation for audio size, duration, sample count, channel count, segment count, filter count, mix source count, prompt size, generated output duration, render/export size, artifact size, provider quota, network transfer, timeout, CPU/GPU class, memory, storage, streaming output, and retained snapshots.
+- [x] 3.3 Implement provider/audio/artifact/segment/mix/prompt/voice/export scope checks for declared audio, private recordings, voice-sensitive assets, generated audio, denied scopes, stale handles, and external delivery.
+- [x] 3.4 Implement policy checks for format/codec/container support, duration, sample rate, channel layout, loudness/waveform projection limits, metadata stripping, segment ranges, filter graph compatibility, mix source rights/consent, prompt redaction, voice consent/safety, generated-voice provenance, export format/quality policy, artifact retention, and output redaction.
+- [x] 3.5 Implement resource reservation for audio size, duration, sample count, channel count, segment count, filter count, mix source count, prompt size, generated output duration, render/export size, artifact size, provider quota, network transfer, timeout, CPU/GPU class, memory, storage, streaming output, and retained snapshots.
 - [x] 3.6 Implement entitlement checks and structured unavailable/denied diagnostics for missing provider, disabled pack, missing credential reference, missing audio permission, unsupported format/codec/container/sample-rate/channel/synthesis/export support, disabled network, missing entitlement, provider quota, and host resource denial.
-- [ ] 3.7 Implement approval behavior for private recordings, human voices, speaker identity, minors, legal/medical/financial calls, copyrighted music, raw prompts, generated voices, external delivery, metadata stripping, destructive edits, and operations that publish artifacts.
+- [x] 3.7 Implement approval behavior for private recordings, human voices, speaker identity, minors, legal/medical/financial calls, copyrighted music, raw prompts, generated voices, external delivery, metadata stripping, destructive edits, and operations that publish artifacts.
 - [x] 3.8 Add tests proving denied, validation, quota, unavailable, conflict, stale-version, schema-mismatch, format-unsupported, codec-unsupported, metadata-denied, voice-denied, prompt-denied, synthesis-denied, export-denied, write-denied, artifact-denied, unsupported, timeout, cancellation, and approval-required paths do not call concrete providers, mutate audio, synthesize outputs, export artifacts, strip metadata, publish assets, or expose raw audio/prompt data.
 
 ## 4. Service Provider And Runtime Integration
@@ -35,10 +35,10 @@
 - [x] 4.1 Implement or bind the audio media service provider behind the service runtime; do not construct audio providers from SDK, shell, kernel, or application code.
 - [x] 4.2 Add a deterministic unavailable provider that returns typed unavailable/unsupported diagnostics and complete discovery metadata.
 - [x] 4.3 Add mock provider support for provider inspection, import/open, metadata inspection, waveform inspection, transcode planning/request, segment planning/request, filter planning/request, mix planning/request, synthesis planning/request, export planning/request, artifact handles, health, and provider capability inspection.
-- [ ] 4.4 Add lifecycle, health, snapshot, shutdown, timeout, cancellation, bounded paging, asynchronous artifact behavior, audio version freshness, stale-version diagnostics, schema/format/codec mismatch diagnostics, voice/synthesis diagnostics, artifact retention, and rate-limit diagnostics.
-- [ ] 4.5 Add Strategy implementations for provider adapters, format/container readers, transcoders, segmenters, filter engines, mix engines, synthesis providers, export providers, artifact providers, redaction, and unavailable behavior.
+- [x] 4.4 Add lifecycle, health, snapshot, shutdown, timeout, cancellation, bounded paging, asynchronous artifact behavior, audio version freshness, stale-version diagnostics, schema/format/codec mismatch diagnostics, voice/synthesis diagnostics, artifact retention, and rate-limit diagnostics.
+- [x] 4.5 Add Strategy implementations for provider adapters, format/container readers, transcoders, segmenters, filter engines, mix engines, synthesis providers, export providers, artifact providers, redaction, and unavailable behavior.
 - [x] 4.6 Add side-effect safety support for idempotency keys, provider state validation, audio version preconditions, consent/copyright metadata, voice safety state, prompt redaction, approval state, artifact retention, generated-voice provenance, and non-mutating plan commands.
-- [ ] 4.7 Add provider capability reporting for available, degraded, preview, unavailable, unsupported, retired, format-limited, transcode-limited, segment-limited, filter-limited, mix-limited, synthesis-limited, export-limited, network-limited, CPU/GPU-limited, and quota-limited states.
+- [x] 4.7 Add provider capability reporting for available, degraded, preview, unavailable, unsupported, retired, format-limited, transcode-limited, segment-limited, filter-limited, mix-limited, synthesis-limited, export-limited, network-limited, CPU/GPU-limited, and quota-limited states.
 
 ## 5. SDK, WASM ABI, Application Framework, And Examples
 
@@ -57,7 +57,7 @@
 - [x] 6.4 Add dependency gates proving kernel, SDK, shells, and generic application framework do not import concrete FFmpeg, GStreamer, Web Audio, libsndfile, OpenAI, ElevenLabs, Google TTS, Polly, storage, moderation, credential-manager, artifact-provider, or provider adapters.
 - [x] 6.5 Add no-direct-provider-call gates proving SDK helpers, WASM ABI handlers, app admission, web, CLI, and frontend paths route through descriptor-owned service commands.
 - [x] 6.6 Add boundary tests proving optional provider absence returns structured unavailable diagnostics and never crashes, hangs, silently falls back, reads private recordings, mutates audio, synthesizes outputs, exports audio, strips metadata, publishes artifacts, contacts providers, or fakes success.
-- [ ] 6.7 Run `openspec validate add-pack-media-audio --strict`, targeted cargo tests, boundary gates, file-size gates, and audit replay checks before marking implementation complete.
+- [x] 6.7 Run `openspec validate add-pack-media-audio --strict`, targeted cargo tests, boundary gates, file-size gates, and audit replay checks before marking implementation complete.
 
 ## 7. Developer Documentation
 

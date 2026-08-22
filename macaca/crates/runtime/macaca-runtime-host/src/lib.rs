@@ -125,6 +125,7 @@ pub mod mcp_runtime;
 pub mod mcp_service_provider;
 pub mod media_audio_service_provider;
 mod media_audio_service_state;
+mod media_audio_strategy;
 pub mod media_transcription_service_provider;
 mod media_transcription_service_state;
 mod media_transcription_strategy;

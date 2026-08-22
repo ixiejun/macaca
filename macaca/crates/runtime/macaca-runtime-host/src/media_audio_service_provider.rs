@@ -4,15 +4,13 @@
 //! prompts, voice data, audio files, or provider payloads. Production adapters
 //! are selected only by the runtime-host composition root.
 
-use std::{
-    collections::{BTreeMap, BTreeSet},
-    sync::Arc,
-};
+use std::{collections::BTreeMap, sync::Arc};
 
 use async_trait::async_trait;
 use macaca_kernel::SystemService;
 use macaca_proto::media_audio::{
     AudioProviderCapability, MEDIA_AUDIO_COMMANDS, MEDIA_AUDIO_PACK_ID, MEDIA_AUDIO_SERVICE_ID,
+    MEDIA_AUDIO_TRACE_EVENTS,
 };
 use macaca_proto::{
     admit_audio_operation, domain_pack_command_trace, domain_pack_service_result,
@@ -23,6 +21,7 @@ use macaca_proto::{
 use tracing::{info, warn};
 
 use crate::media_audio_service_state::AudioSideEffectLedger;
+use crate::media_audio_strategy::{ConfiguredMediaAudioStrategy, MediaAudioProviderStrategy};
 
 /// Bounded audit/replay event that deliberately excludes all media payloads.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -41,12 +40,24 @@ pub struct MediaAudioSystemServiceProvider {
     events: tokio::sync::broadcast::Sender<AudioRuntimeEvent>,
     side_effects: Arc<AudioSideEffectLedger>,
     admission_facts: AudioPreflightFacts,
+    strategy: Arc<dyn MediaAudioProviderStrategy>,
 }
 
 impl MediaAudioSystemServiceProvider {
     /// Build a deterministic metadata-only provider for contract and ABI tests.
     pub fn mock() -> Self {
         Self::new(None)
+    }
+
+    /// Build synthetic audio capability state with explicit command gaps.
+    pub fn mock_with_commands<I, S>(commands: I) -> Self
+    where
+        I: IntoIterator<Item = S>,
+        S: Into<String>,
+    {
+        let mut provider = Self::new(None);
+        provider.strategy = Arc::new(ConfiguredMediaAudioStrategy::with_commands(commands));
+        provider
     }
 
     /// Build a fail-closed Null Object when no audio module is installed.
@@ -56,11 +67,18 @@ impl MediaAudioSystemServiceProvider {
 
     fn new(unavailable_reason: Option<String>) -> Self {
         let (events, _) = tokio::sync::broadcast::channel(256);
+        let strategy: Arc<dyn MediaAudioProviderStrategy> =
+            Arc::new(if unavailable_reason.is_some() {
+                ConfiguredMediaAudioStrategy::unavailable()
+            } else {
+                ConfiguredMediaAudioStrategy::mock()
+            });
         Self {
             unavailable_reason,
             events,
             side_effects: Arc::new(AudioSideEffectLedger::default()),
             admission_facts: AudioPreflightFacts::permissive(),
+            strategy,
         }
     }
 
@@ -76,27 +94,7 @@ impl MediaAudioSystemServiceProvider {
 
     /// Report descriptor-owned capability facts, never engine or voice internals.
     pub fn capability(&self) -> AudioProviderCapability {
-        AudioProviderCapability {
-            provider_class: if self.unavailable_reason.is_some() {
-                "unavailable"
-            } else {
-                "mock"
-            }
-            .into(),
-            codecs: BTreeSet::from(["pcm".into()]),
-            containers: BTreeSet::from(["wav".into()]),
-            features: if self.unavailable_reason.is_some() {
-                BTreeSet::new()
-            } else {
-                BTreeSet::from(["metadata_only".into(), "planning".into()])
-            },
-            max_duration_ms: 300_000,
-            state: if self.unavailable_reason.is_some() {
-                DomainPackProviderCapabilityState::Unavailable
-            } else {
-                DomainPackProviderCapabilityState::Preview
-            },
-        }
+        self.strategy.capability()
     }
 
     /// Subscribe to bounded events for audit and replay conformance checks.
@@ -160,6 +158,10 @@ impl SystemService for MediaAudioSystemServiceProvider {
             "command_count".into(),
             MEDIA_AUDIO_COMMANDS.len().to_string(),
         );
+        descriptor.metadata.insert(
+            "trace_event_count".into(),
+            MEDIA_AUDIO_TRACE_EVENTS.len().to_string(),
+        );
         descriptor
     }
 
@@ -181,13 +183,16 @@ impl SystemService for MediaAudioSystemServiceProvider {
         let operation = command.name.as_str();
         if !MEDIA_AUDIO_COMMANDS.contains(&operation) {
             self.emit(operation, &trace.trace_id, "unsupported");
-            return Err(ServiceError::UnsupportedCommand(operation.into()));
+            return Err(normalize_audio_error(ServiceError::UnsupportedCommand(
+                operation.into(),
+            )));
         }
         if let Some(reason) = &self.unavailable_reason {
             self.emit(operation, &trace.trace_id, "unavailable");
             warn!(service_id = MEDIA_AUDIO_SERVICE_ID, command = operation, trace_id = %trace.trace_id, reason_code = %reason, "media audio provider unavailable");
             return Err(ServiceError::ServiceUnavailable(reason.clone()));
         }
+        self.strategy.validate_command(operation)?;
         if let Err(rejection) = admit_audio_operation(operation, self.admission_facts) {
             self.emit(operation, &trace.trace_id, "preflight_rejected");
             warn!(service_id = MEDIA_AUDIO_SERVICE_ID, command = operation, trace_id = %trace.trace_id, rejection = ?rejection, "media audio command rejected before provider dispatch");
@@ -195,7 +200,13 @@ impl SystemService for MediaAudioSystemServiceProvider {
         }
         if let Some(reason) = audio_payload_denial(operation, &command.payload) {
             self.emit(operation, &trace.trace_id, "payload_rejected");
-            return Err(ServiceError::DisabledByPolicy(reason.into()));
+            return Err(normalize_audio_error(ServiceError::DisabledByPolicy(
+                reason.into(),
+            )));
+        }
+        if let Some(reason) = audio_request_bounds(operation, &command.payload) {
+            self.emit(operation, &trace.trace_id, "bounds_rejected");
+            return Err(ServiceError::AdapterFailure(reason.into()));
         }
         if let Err(error) = AudioSideEffectLedger::validate_audio_version(&command) {
             self.emit(operation, &trace.trace_id, "precondition_rejected");
@@ -268,6 +279,67 @@ fn audio_payload_denial(operation: &str, payload: &serde_json::Value) -> Option<
                     .is_some_and(|duration| duration > 300_000))
             .then_some("duration_limit_exceeded")
         })
+}
+
+/// Enforce bounded media metadata before allocating side-effect references.
+fn audio_request_bounds(operation: &str, payload: &serde_json::Value) -> Option<&'static str> {
+    let duration = payload
+        .get("duration_ms")
+        .and_then(serde_json::Value::as_u64)
+        .is_some_and(|value| value > 300_000);
+    let sample_count = payload
+        .get("sample_count")
+        .and_then(serde_json::Value::as_u64)
+        .is_some_and(|value| value > 50_000_000);
+    let channels = payload
+        .get("channel_count")
+        .and_then(serde_json::Value::as_u64)
+        .is_some_and(|value| value > 64);
+    let prompt_bytes = payload
+        .get("prompt_bytes")
+        .and_then(serde_json::Value::as_u64)
+        .is_some_and(|value| value > 64 * 1024);
+    let external_delivery = payload
+        .get("external_delivery")
+        .and_then(serde_json::Value::as_bool)
+        == Some(true)
+        && payload
+            .get("approval_granted")
+            .and_then(serde_json::Value::as_bool)
+            != Some(true);
+    if duration {
+        return Some("audio_duration_limit");
+    }
+    if sample_count {
+        return Some("audio_sample_limit");
+    }
+    if channels {
+        return Some("audio_channel_limit");
+    }
+    if operation == "audio.plan_synthesis" && prompt_bytes {
+        return Some("audio_prompt_limit");
+    }
+    external_delivery.then_some("audio_external_delivery_approval")
+}
+
+/// Normalize provider-specific strings into bounded service error classes.
+fn normalize_audio_error(error: ServiceError) -> ServiceError {
+    match error {
+        ServiceError::ServiceUnavailable(_) => {
+            ServiceError::ServiceUnavailable("audio_provider_unavailable".into())
+        }
+        ServiceError::UnsupportedCommand(_) => {
+            ServiceError::UnsupportedCommand("audio_command_unsupported".into())
+        }
+        ServiceError::DisabledByPolicy(reason) => ServiceError::DisabledByPolicy(
+            reason
+                .chars()
+                .filter(|character| character.is_ascii_alphanumeric() || *character == '_')
+                .take(64)
+                .collect(),
+        ),
+        other => other,
+    }
 }
 
 /// Map command and lifecycle markers to stable sanitized audit vocabulary.

@@ -373,3 +373,45 @@ async fn audio_emits_stable_audit_taxonomy() {
         );
     }
 }
+
+#[test]
+fn audio_provider_strategy_replacement_reports_capability_gaps() {
+    let provider = MediaAudioSystemServiceProvider::mock_with_commands(["audio.open_audio"]);
+    assert!(provider.capability().features.contains("metadata_only"));
+    assert!(provider.capability().codecs.contains("pcm"));
+}
+
+#[tokio::test]
+async fn audio_policy_and_resource_bounds_fail_before_side_effects() {
+    let provider = MediaAudioSystemServiceProvider::mock();
+    for (command, payload, reason) in [
+        (
+            "audio.transcode_request",
+            serde_json::json!({"duration_ms": 300_001}),
+            "audio_duration_limit",
+        ),
+        (
+            "audio.plan_synthesis",
+            serde_json::json!({"prompt_bytes": 65_537}),
+            "audio_prompt_limit",
+        ),
+        (
+            "audio.export_request",
+            serde_json::json!({"external_delivery": true}),
+            "audio_external_delivery_approval",
+        ),
+    ] {
+        let result = provider
+            .call(ServiceCommand::with_trace(
+                ServiceCommandName::new(command),
+                payload,
+                TraceContext::new(reason),
+            ))
+            .await;
+        assert!(result.unwrap_err().to_string().contains(reason));
+    }
+    assert_eq!(
+        provider.snapshot().await["idempotency_completion_count"],
+        "0"
+    );
+}
