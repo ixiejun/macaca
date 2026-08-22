@@ -35,6 +35,7 @@ mod commerce_order_validation;
 mod commerce_order_validation_permissions;
 pub mod commerce_payment_intent;
 mod commerce_payment_intent_validation;
+mod commerce_payment_intent_validation_permissions;
 pub mod commerce_receipt;
 mod commerce_receipt_validation;
 mod communication_calendar;

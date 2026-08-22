@@ -32,6 +32,20 @@ pub const COMMERCE_PAYMENT_INTENT_COMMANDS: &[&str] = &[
     "payment_intent.get_artifact_handle",
 ];
 
+pub const COMMERCE_PAYMENT_INTENT_TRACE_EVENTS: &[&str] = &[
+    "payment_intent_pack_declared",
+    "payment_intent_pack_admission_validated",
+    "payment_intent_pack_policy_decision",
+    "payment_intent_pack_provider_inspected",
+    "payment_intent_pack_service_call_requested",
+    "payment_intent_pack_service_call_succeeded",
+    "payment_intent_pack_service_call_failed",
+    "payment_intent_pack_state_transition_planned",
+    "payment_intent_pack_sensitive_input_rejected",
+    "payment_intent_pack_unavailable",
+    "payment_intent_pack_snapshot_recorded",
+];
+
 const PAYMENT_INTENT_PERMISSION_SCOPES: &[&str] = &[
     "commerce.payment.intent.read",
     "commerce.payment.intent.create",

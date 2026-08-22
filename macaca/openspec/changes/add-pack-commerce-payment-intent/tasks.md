@@ -35,25 +35,25 @@
 ## 4. Permission, Policy, Resource, Entitlement, And Approval
 
 - [x] 4.1 Add declaration validation for `commerce.payment.intent.read`, `commerce.payment.intent.create`, `commerce.payment.intent.confirm`, `commerce.payment.intent.capture`, `commerce.payment.intent.cancel`, and `commerce.payment.intent.audit_export`.
-- [ ] 4.2 Require policy decisions before every command and approval before create, confirm/authorize, capture, cancel/void, and retained audit exports.
-- [ ] 4.3 Require entitlement checks for provider access, payment method support, create support, confirm/authorize support, capture support, cancel/void support, event support, and merchant account access.
-- [ ] 4.4 Reserve and meter resources for provider calls, status sync, event reference ingestion, audit export size, storage, provider quotas, and snapshots.
-- [ ] 4.5 Return typed denied/unavailable/unsupported/conflict/quota/stale-data outcomes before provider calls when preconditions fail.
-- [ ] 4.6 Add tests proving denied, raw-credential, unavailable, unsupported, conflict, quota, and stale-data paths do not call concrete providers when preconditions fail.
+- [x] 4.2 Require policy decisions before every command and approval before create, confirm/authorize, capture, cancel/void, and retained audit exports.
+- [x] 4.3 Require entitlement checks for provider access, payment method support, create support, confirm/authorize support, capture support, cancel/void support, event support, and merchant account access.
+- [x] 4.4 Reserve and meter resources for provider calls, status sync, event reference ingestion, audit export size, storage, provider quotas, and snapshots.
+- [x] 4.5 Return typed denied/unavailable/unsupported/conflict/quota/stale-data outcomes before provider calls when preconditions fail.
+- [x] 4.6 Add tests proving denied, raw-credential, unavailable, unsupported, conflict, quota, and stale-data paths do not call concrete providers when preconditions fail.
 
 ## 5. Service Provider, Provider Strategy, And Unavailable Behavior
 
-- [ ] 5.1 Add the payment-intent service provider interface with descriptor, lifecycle, health, snapshot, shutdown, timeout, cancellation, async event/export support, and command dispatch.
-- [ ] 5.2 Implement provider Strategy adapters behind the service interface without provider-name routing in OS-layer command logic.
-- [ ] 5.3 Implement a mock provider with synthetic intent states, action-required states, captures, cancellations, event references, idempotency outcomes, stale-data states, and configurable capability gaps.
+- [x] 5.1 Add the payment-intent service provider interface with descriptor, lifecycle, health, snapshot, shutdown, timeout, cancellation, async event/export support, and command dispatch.
+- [x] 5.2 Implement provider Strategy adapters behind the service interface without provider-name routing in OS-layer command logic.
+- [x] 5.3 Implement a mock provider with synthetic intent states, action-required states, captures, cancellations, event references, idempotency outcomes, stale-data states, and configurable capability gaps.
 - [x] 5.4 Implement an unavailable provider that returns explicit unavailable diagnostics for every command without fake success.
-- [ ] 5.5 Normalize provider errors into Macaca result envelopes while preserving sanitized provider class, bounded code, retriable flag, state, freshness, idempotency hash, and replay pointer.
-- [ ] 5.6 Add provider capability discovery for payment methods, capture modes, action/redirect support, async event support, cancel/void support, partial capture support, idempotency model, status freshness, limits, attribution, and entitlement.
+- [x] 5.5 Normalize provider errors into Macaca result envelopes while preserving sanitized provider class, bounded code, retriable flag, state, freshness, idempotency hash, and replay pointer.
+- [x] 5.6 Add provider capability discovery for payment methods, capture modes, action/redirect support, async event support, cancel/void support, partial capture support, idempotency model, status freshness, limits, attribution, and entitlement.
 
 ## 6. SDK, Admission, Examples, And Developer Documentation
 
 - [x] 6.1 Extend pack catalog and SDK discovery for `pack.commerce.payment.intent.v1` with schemas, scopes, examples, availability, health, diagnostics, compatibility, provider class, and docs metadata.
-- [ ] 6.2 Extend application admission so required declarations block on unavailable/denied states and optional declarations degrade explicitly with effective capability mementos.
+- [x] 6.2 Extend application admission so required declarations block on unavailable/denied states and optional declarations degrade explicitly with effective capability mementos.
 - [x] 6.3 Add SDK command helper builders that only construct canonical traced service calls and never construct providers.
 - [x] 6.4 Add generic app-facing examples for planning/creating intents, confirming/authorizing, handling action-required state, capturing, canceling/voiding, syncing status, inspecting idempotency, and handling conflicts.
 - [x] 6.5 Create `docs/developer-packs/commerce/payment-intent.md` with purpose, manifest declaration, scopes, commands, DTOs, examples, unavailable diagnostics, provider replacement, trace/audit behavior, redaction, state-machine semantics, idempotency, action-required handling, and refund/receipt/settlement boundaries.
@@ -61,18 +61,18 @@
 
 ## 7. Trace, Audit, Replay, And Redaction
 
-- [ ] 7.1 Emit sanitized declaration, admission, provider-inspection, policy, entitlement, approval, resource, service-call, state-transition-planning, sensitive-input-rejection, unavailable, health, snapshot, and result events.
-- [ ] 7.2 Add trace schemas for `payment_intent_pack_declared`, `payment_intent_pack_admission_validated`, `payment_intent_pack_policy_decision`, `payment_intent_pack_provider_inspected`, `payment_intent_pack_service_call_requested`, `payment_intent_pack_service_call_succeeded`, `payment_intent_pack_service_call_failed`, `payment_intent_pack_state_transition_planned`, `payment_intent_pack_sensitive_input_rejected`, `payment_intent_pack_unavailable`, and `payment_intent_pack_snapshot_recorded`.
-- [ ] 7.3 Add replay tests proving every command is trace-addressable through the canonical service runtime path.
-- [ ] 7.4 Add snapshot tests proving descriptor, provider health, command availability, state/capture/cancel/event support, policy-template hash, redaction profile, resource counters, freshness, and replay pointers are retained without raw payload leakage.
-- [ ] 7.5 Add redaction tests proving raw payment credentials, client secrets, raw provider payloads, SCA payloads, wallet cryptograms, webhook bodies, private keys, signatures, and unbounded output never enter logs, traces, snapshots, or SDK diagnostics.
+- [x] 7.1 Emit sanitized declaration, admission, provider-inspection, policy, entitlement, approval, resource, service-call, state-transition-planning, sensitive-input-rejection, unavailable, health, snapshot, and result events.
+- [x] 7.2 Add trace schemas for `payment_intent_pack_declared`, `payment_intent_pack_admission_validated`, `payment_intent_pack_policy_decision`, `payment_intent_pack_provider_inspected`, `payment_intent_pack_service_call_requested`, `payment_intent_pack_service_call_succeeded`, `payment_intent_pack_service_call_failed`, `payment_intent_pack_state_transition_planned`, `payment_intent_pack_sensitive_input_rejected`, `payment_intent_pack_unavailable`, and `payment_intent_pack_snapshot_recorded`.
+- [x] 7.3 Add replay tests proving every command is trace-addressable through the canonical service runtime path.
+- [x] 7.4 Add snapshot tests proving descriptor, provider health, command availability, state/capture/cancel/event support, policy-template hash, redaction profile, resource counters, freshness, and replay pointers are retained without raw payload leakage.
+- [x] 7.5 Add redaction tests proving raw payment credentials, client secrets, raw provider payloads, SCA payloads, wallet cryptograms, webhook bodies, private keys, signatures, and unbounded output never enter logs, traces, snapshots, or SDK diagnostics.
 
 ## 8. Boundary, Quality, And Validation Gates
 
-- [ ] 8.1 Add dependency gates proving kernel, SDK, shells, and generic application framework do not import concrete payment-intent providers.
+- [x] 8.1 Add dependency gates proving kernel, SDK, shells, and generic application framework do not import concrete payment-intent providers.
 - [x] 8.2 Add no-direct-provider-call tests proving all callable operations traverse descriptor-owned service registration and typed service commands.
-- [ ] 8.3 Add canonical execution-path tests covering read-only, creation, confirmation, action-required, capture, cancellation, event reference, audit export, denied, unavailable, unsupported, conflict, quota, stale-data, and raw-credential rejection paths.
-- [ ] 8.4 Add provider replacement tests for built-in, plugin, remote, mock, and unavailable providers.
+- [x] 8.3 Add canonical execution-path tests covering read-only, creation, confirmation, action-required, capture, cancellation, event reference, audit export, denied, unavailable, unsupported, conflict, quota, stale-data, and raw-credential rejection paths.
+- [x] 8.4 Add provider replacement tests for built-in, plugin, remote, mock, and unavailable providers.
 - [x] 8.5 Add file-size and module-ownership checks for any new implementation files.
 - [x] 8.6 Run `openspec validate add-pack-commerce-payment-intent --strict`.
-- [ ] 8.7 Run targeted cargo checks/tests, dependency-boundary gates, audit replay checks, redaction checks, and payment/refund/receipt/settlement boundary checks before marking implementation tasks complete.
+- [x] 8.7 Run targeted cargo checks/tests, dependency-boundary gates, audit replay checks, redaction checks, and payment/refund/receipt/settlement boundary checks before marking implementation tasks complete.

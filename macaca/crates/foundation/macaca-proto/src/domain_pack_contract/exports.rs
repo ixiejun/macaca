@@ -4,7 +4,6 @@
 //! provider-neutral DTOs from private implementation modules. Keeping those
 //! exports in this file preserves that API while allowing `mod.rs` to stay as
 //! the small module registry required by the OS source-size constitution.
-
 pub use super::catalog::{
     compose_installed_domain_pack_catalog, empty_domain_pack_catalog, snapshot_domain_pack_catalog,
     DomainPackCatalog, DomainPackCatalogSnapshot, InMemoryDomainPackCatalog,
@@ -41,9 +40,7 @@ pub use super::commerce_catalog::{
     COMMERCE_CATALOG_PACK_ID, COMMERCE_CATALOG_SERVICE_ID, COMMERCE_CATALOG_TRACE_EVENTS,
 };
 pub use super::commerce_catalog_validation_permissions::validate_commerce_catalog_permission_declarations;
-pub use super::commerce_common::{
-    CommercePackCommandEnvelope, CommercePackError, CommercePackPage,
-};
+pub use super::commerce_common::{CommercePackCommandEnvelope, CommercePackError, CommercePackPage};
 pub use super::commerce_entitlement::{
     commerce_entitlement_descriptor_hashes, commerce_entitlement_pack_definition,
     entitlement_stable_hash, CommerceEntitlementAssignSeatCommand,
@@ -100,7 +97,9 @@ pub use super::commerce_payment_intent::{
     PaymentIntentRedactionPolicy, PaymentIntentResultEnvelope, PaymentIntentResultStatus,
     PaymentIntentScope, PaymentMethodReference, COMMERCE_PAYMENT_INTENT_COMMANDS,
     COMMERCE_PAYMENT_INTENT_PACK_ID, COMMERCE_PAYMENT_INTENT_SERVICE_ID,
+    COMMERCE_PAYMENT_INTENT_TRACE_EVENTS,
 };
+pub use super::commerce_payment_intent_validation_permissions::validate_commerce_payment_intent_permission_declarations;
 pub use super::commerce_receipt::{
     commerce_receipt_descriptor_hashes, commerce_receipt_pack_definition, receipt_stable_hash,
     ReceiptAdjustment, ReceiptArtifactHandle, ReceiptAttribution, ReceiptAudience,

@@ -11,8 +11,9 @@ use std::sync::Arc;
 use macaca_proto::{
     expand_service_capabilities, validate_audio_permission_declarations,
     validate_camera_permission_declarations, validate_commerce_catalog_permission_declarations,
-    validate_commerce_order_permission_declarations, validate_filesystem_root_declarations,
-    validate_finance_accounting_permission_declarations,
+    validate_commerce_order_permission_declarations,
+    validate_commerce_payment_intent_permission_declarations,
+    validate_filesystem_root_declarations, validate_finance_accounting_permission_declarations,
     validate_host_lifecycle_permission_declarations,
     validate_identity_account_permission_declarations,
     validate_identity_auth_handoff_permission_declarations,
@@ -225,6 +226,10 @@ impl ApplicationAbiAdapter for YamlApplicationAbiAdapter {
             })?;
             validate_commerce_order_permission_declarations(service_contract).map_err(|reason| {
                 warn!(application_id = %application_id, reason, "commerce order permission admission rejected");
+                ApplicationAbiError::InvalidDeclaration(reason.into())
+            })?;
+            validate_commerce_payment_intent_permission_declarations(service_contract).map_err(|reason| {
+                warn!(application_id = %application_id, reason, "payment intent permission admission rejected");
                 ApplicationAbiError::InvalidDeclaration(reason.into())
             })?;
         }
