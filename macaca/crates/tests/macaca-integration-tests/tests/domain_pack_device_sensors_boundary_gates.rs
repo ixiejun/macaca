@@ -15,6 +15,16 @@ const FORBIDDEN: &[&str] = &[
     "host_sensor_adapter",
     "raw_sample_vector",
 ];
+const DIRECT_CALL_SURFACES: &[&str] = &[
+    "crates/facade/macaca-sdk/src",
+    "crates/runtime/macaca-runtime-host/src/wasm_runtime_provider/host_import_bridge",
+];
+const DIRECT_CALL_FORBIDDEN: &[&str] = &[
+    "DeviceSensorsSystemServiceProvider",
+    "device_sensors_service_provider",
+    "raw_sample_vector",
+    "host_sensor_adapter",
+];
 
 #[test]
 fn sensor_providers_stay_outside_provider_neutral_layers() {
@@ -41,6 +51,43 @@ fn sensor_providers_stay_outside_provider_neutral_layers() {
     assert!(
         violations.is_empty(),
         "sensor boundary violations:\n{}",
+        violations.join("\n")
+    );
+}
+
+#[test]
+fn sensor_sdk_and_wasm_imports_cannot_bypass_service_runtime() {
+    assert_no_tokens(
+        DIRECT_CALL_SURFACES,
+        DIRECT_CALL_FORBIDDEN,
+        "sensor direct-provider bypasses",
+    );
+}
+
+fn assert_no_tokens(surfaces: &[&str], forbidden: &[&str], message: &str) {
+    let root = workspace_root();
+    let mut violations = Vec::new();
+    for surface in surfaces {
+        for source in rust_files(&root.join(surface)) {
+            for (line_number, line) in read_source(&source).lines().enumerate() {
+                if line.trim_start().starts_with("//") {
+                    continue;
+                }
+                for token in forbidden {
+                    if line.contains(token) {
+                        violations.push(format!(
+                            "{}:{}:{token}",
+                            source.strip_prefix(&root).unwrap().display(),
+                            line_number + 1
+                        ));
+                    }
+                }
+            }
+        }
+    }
+    assert!(
+        violations.is_empty(),
+        "{message}:\n{}",
         violations.join("\n")
     );
 }
