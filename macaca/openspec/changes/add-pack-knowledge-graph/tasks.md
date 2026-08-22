@@ -54,7 +54,7 @@
 - [ ] 6.2 Ensure traces, audits, snapshots, SDK diagnostics, and examples exclude raw credentials, raw provider payloads, raw private graph values, raw source documents, raw execution plans, raw sensitive queries, unbounded outputs, package bytes, manifests, private keys, and signatures.
 - [x] 6.3 Add replay tests proving every `graph.*` command is trace-addressable through the canonical service path and that snapshots contain enough bounded metadata for recovery diagnostics.
 - [x] 6.4 Add dependency gates proving kernel, SDK, shells, and generic application framework do not import concrete graph providers, query engines, database clients, or provider-specific adapters.
-- [ ] 6.5 Add no-direct-provider-call gates proving SDK helpers, WASM ABI handlers, app admission, web, CLI, and frontend paths route through descriptor-owned service commands.
+- [x] 6.5 Add no-direct-provider-call gates proving SDK helpers, WASM ABI handlers, app admission, web, CLI, and frontend paths route through descriptor-owned service commands.
 - [ ] 6.6 Add boundary tests proving optional provider absence returns structured unavailable diagnostics and never crashes, hangs, silently falls back, or fakes success.
 - [x] 6.7 Run `openspec validate add-pack-knowledge-graph --strict`, targeted cargo tests, boundary gates, file-size gates, and audit replay checks before marking implementation complete.
 
