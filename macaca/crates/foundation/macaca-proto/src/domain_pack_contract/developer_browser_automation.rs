@@ -35,6 +35,21 @@ pub const DEVELOPER_BROWSER_AUTOMATION_COMMANDS: &[&str] = &[
     "browser.close_context",
 ];
 
+pub const DEVELOPER_BROWSER_AUTOMATION_TRACE_EVENTS: &[&str] = &[
+    "browser_pack_declared",
+    "browser_pack_admission_validated",
+    "browser_pack_policy_decision",
+    "browser_pack_provider_inspected",
+    "browser_pack_context_opened",
+    "browser_pack_page_opened",
+    "browser_pack_navigation",
+    "browser_pack_action_requested",
+    "browser_pack_evaluation_requested",
+    "browser_pack_artifact_recorded",
+    "browser_pack_unavailable",
+    "browser_pack_snapshot_recorded",
+];
+
 const BROWSER_PERMISSION_SCOPES: &[&str] = &[
     "browser.provider.inspect",
     "browser.context.open",

@@ -55,6 +55,7 @@ mod communication_notification;
 pub mod communication_notification_preflight;
 mod communication_notification_validation;
 pub mod developer_browser_automation;
+mod developer_browser_automation_validation_permissions;
 pub mod developer_ci;
 pub mod developer_code;
 pub mod developer_common;
