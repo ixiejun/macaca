@@ -1,4 +1,3 @@
-//! Stable root-level exports for provider-neutral domain-pack contracts.
 pub use super::catalog::{
     compose_installed_domain_pack_catalog, empty_domain_pack_catalog, snapshot_domain_pack_catalog,
     DomainPackCatalog, DomainPackCatalogSnapshot, InMemoryDomainPackCatalog,
@@ -192,6 +191,7 @@ pub use super::developer_browser_automation_validation_permissions::validate_dev
 pub use super::developer_ci_validation_permissions::validate_developer_ci_permission_declarations;
 pub use super::developer_code_validation_permissions::validate_developer_code_permission_declarations;
 pub use super::developer_design_tools_validation_permissions::validate_developer_design_tools_permission_declarations;
+pub use super::developer_issue_tracker_validation_permissions::validate_developer_issue_tracker_permission_declarations;
 pub use super::device_camera_preflight::{
     admit_camera_operation, transition_camera_session, CameraPreflightFacts,
     CameraPreflightFailure, CameraSessionAction, CameraSessionState,

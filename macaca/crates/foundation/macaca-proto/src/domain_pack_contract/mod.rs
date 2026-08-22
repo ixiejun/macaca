@@ -64,6 +64,7 @@ pub mod developer_common;
 pub mod developer_design_tools;
 mod developer_design_tools_validation_permissions;
 pub mod developer_issue_tracker;
+mod developer_issue_tracker_validation_permissions;
 pub mod developer_repository;
 pub mod developer_terminal;
 pub mod device_camera;

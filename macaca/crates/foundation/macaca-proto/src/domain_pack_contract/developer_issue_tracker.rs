@@ -34,6 +34,33 @@ pub const DEVELOPER_ISSUE_TRACKER_COMMANDS: &[&str] = &[
     "issue_tracker.inspect_timeline",
 ];
 
+/// Sanitized event vocabulary for issue-tracker service tracing and replay.
+pub const DEVELOPER_ISSUE_TRACKER_TRACE_EVENTS: &[&str] = &[
+    "issue_tracker_pack_declared",
+    "issue_tracker_admission_validated",
+    "issue_tracker_provider_inspected",
+    "issue_tracker_project_listed",
+    "issue_tracker_schema_inspected",
+    "issue_tracker_issue_searched",
+    "issue_tracker_issue_read",
+    "issue_tracker_create_planned",
+    "issue_tracker_create_requested",
+    "issue_tracker_update_planned",
+    "issue_tracker_update_requested",
+    "issue_tracker_comments_listed",
+    "issue_tracker_comment_requested",
+    "issue_tracker_transition_planned",
+    "issue_tracker_transition_requested",
+    "issue_tracker_labels_managed",
+    "issue_tracker_assignees_managed",
+    "issue_tracker_relations_managed",
+    "issue_tracker_attachment_handle_issued",
+    "issue_tracker_timeline_inspected",
+    "issue_tracker_policy_decision",
+    "issue_tracker_unavailable",
+    "issue_tracker_snapshot_recorded",
+];
+
 const ISSUE_PERMISSION_SCOPES: &[&str] = &[
     "issue_tracker.provider.inspect",
     "issue_tracker.project.read",
