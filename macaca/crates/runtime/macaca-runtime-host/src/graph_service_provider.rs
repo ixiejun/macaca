@@ -11,12 +11,18 @@ use async_trait::async_trait;
 use macaca_kernel::SystemService;
 use macaca_proto::{
     domain_pack_command_trace, domain_pack_service_result, DomainPackProviderCapabilityState,
-    GraphProviderCapability, KernelServiceId, ServiceCommand, ServiceDescriptor, ServiceError,
-    ServiceHealth, ServiceResult, ServiceType, TraceSchemaRef, KNOWLEDGE_GRAPH_COMMANDS,
-    KNOWLEDGE_GRAPH_PACK_ID, KNOWLEDGE_GRAPH_SERVICE_ID,
+    GraphImportPlan, GraphProviderCapability, GraphQuery, KernelServiceId, ServiceCommand,
+    ServiceDescriptor, ServiceError, ServiceHealth, ServiceResult, ServiceType, TraceSchemaRef,
+    KNOWLEDGE_GRAPH_COMMANDS, KNOWLEDGE_GRAPH_PACK_ID, KNOWLEDGE_GRAPH_SERVICE_ID,
 };
 use tokio::sync::{broadcast, RwLock};
 use tracing::{info, warn};
+
+use crate::graph_strategies::{
+    default_graph_import_export_strategies, default_graph_query_strategies,
+    DeterministicGraphMergeStrategy, GraphImportExportStrategy, GraphMergeRequest,
+    GraphMergeStrategy, GraphQueryValidationStrategy,
+};
 
 /// Sanitized observation emitted for audit and replay consumers.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -33,6 +39,9 @@ pub struct GraphSystemServiceProvider {
     descriptor: ServiceDescriptor,
     events: broadcast::Sender<GraphRuntimeEvent>,
     references: RwLock<BTreeMap<String, String>>,
+    query_strategies: Vec<Box<dyn GraphQueryValidationStrategy>>,
+    import_export_strategies: Vec<Box<dyn GraphImportExportStrategy>>,
+    merge_strategy: DeterministicGraphMergeStrategy,
     unavailable_reason: Option<String>,
 }
 
@@ -53,6 +62,9 @@ impl GraphSystemServiceProvider {
             descriptor: graph_service_descriptor(),
             events,
             references: RwLock::new(BTreeMap::new()),
+            query_strategies: default_graph_query_strategies(),
+            import_export_strategies: default_graph_import_export_strategies(),
+            merge_strategy: DeterministicGraphMergeStrategy,
             unavailable_reason,
         }
     }
@@ -126,6 +138,13 @@ impl SystemService for GraphSystemServiceProvider {
                 .send(event("graph.policy_decision", &trace.trace_id));
             return Err(ServiceError::DisabledByPolicy(reason.into()));
         }
+        if let Some(reason) = self.strategy_admission_denial(&command) {
+            let _ = self
+                .events
+                .send(event("graph.policy_decision", &trace.trace_id));
+            warn!(service_id = %self.descriptor.id, trace_id = %trace.trace_id, reason_code = reason, "graph Strategy rejected request");
+            return Err(ServiceError::DisabledByPolicy(reason.into()));
+        }
         if self.references.read().await.len() >= 256 {
             return Err(ServiceError::DisabledByPolicy("quota_exceeded".into()));
         }
@@ -176,6 +195,129 @@ impl SystemService for GraphSystemServiceProvider {
             },
             None => ServiceHealth::Healthy,
         })
+    }
+}
+
+impl GraphSystemServiceProvider {
+    /// Run replaceable validation and merge Strategies before reference
+    /// allocation.  Empty payloads retain compatibility with descriptor-only
+    /// conformance calls; typed callers can opt into strict validation by
+    /// supplying the relevant provider-neutral fields.
+    fn strategy_admission_denial(&self, command: &ServiceCommand) -> Option<&'static str> {
+        let payload = &command.payload;
+        if (command.name.as_str() == "graph.query"
+            || command.name.as_str() == "graph.validate_query")
+            && (payload.get("dialect").is_some() || payload.get("query_ref").is_some())
+        {
+            let query = GraphQuery {
+                query_ref: payload
+                    .get("query_ref")
+                    .and_then(serde_json::Value::as_str)
+                    .unwrap_or("opaque-query")
+                    .into(),
+                dialect: payload
+                    .get("dialect")
+                    .and_then(serde_json::Value::as_str)
+                    .unwrap_or("portable")
+                    .into(),
+                max_rows: payload
+                    .get("max_rows")
+                    .and_then(serde_json::Value::as_u64)
+                    .unwrap_or(100)
+                    .min(u32::MAX as u64) as u32,
+                redaction_profile: payload
+                    .get("redaction_profile")
+                    .and_then(serde_json::Value::as_str)
+                    .unwrap_or("bounded")
+                    .into(),
+            };
+            let Some(strategy) = self
+                .query_strategies
+                .iter()
+                .find(|strategy| strategy.mode() == query.dialect)
+            else {
+                return Some("query_dialect_not_supported");
+            };
+            return (!strategy.validate(&query).accepted).then_some("query_strategy_rejected");
+        }
+        if command.name.as_str() == "graph.import_subgraph" && payload.get("format").is_some() {
+            let plan = GraphImportPlan {
+                import_ref: payload
+                    .get("import_ref")
+                    .and_then(serde_json::Value::as_str)
+                    .unwrap_or("opaque-import")
+                    .into(),
+                format: payload
+                    .get("format")
+                    .and_then(serde_json::Value::as_str)
+                    .unwrap_or_default()
+                    .into(),
+                dry_run: payload
+                    .get("dry_run")
+                    .and_then(serde_json::Value::as_bool)
+                    .unwrap_or(true),
+                batch_size: payload
+                    .get("batch_size")
+                    .and_then(serde_json::Value::as_u64)
+                    .unwrap_or(1)
+                    .min(u32::MAX as u64) as u32,
+            };
+            let Some(strategy) = self
+                .import_export_strategies
+                .iter()
+                .find(|strategy| strategy.format() == plan.format)
+            else {
+                return Some("import_format_not_supported");
+            };
+            return (!strategy.validate_import(&plan).accepted)
+                .then_some("import_strategy_rejected");
+        }
+        if command.name.as_str() == "graph.export_subgraph" && payload.get("format").is_some() {
+            let format = payload
+                .get("format")
+                .and_then(serde_json::Value::as_str)
+                .unwrap_or_default();
+            let max_items = payload
+                .get("max_items")
+                .and_then(serde_json::Value::as_u64)
+                .unwrap_or(0)
+                .min(u32::MAX as u64) as u32;
+            let Some(strategy) = self
+                .import_export_strategies
+                .iter()
+                .find(|strategy| strategy.format() == format)
+            else {
+                return Some("export_format_not_supported");
+            };
+            return (!strategy.validate_export(format, max_items).accepted)
+                .then_some("export_strategy_rejected");
+        }
+        if command.name.as_str() == "graph.merge_entities" && payload.get("source_ref").is_some() {
+            let request = GraphMergeRequest {
+                source_ref: payload
+                    .get("source_ref")
+                    .and_then(serde_json::Value::as_str)
+                    .unwrap_or_default()
+                    .into(),
+                target_ref: payload
+                    .get("target_ref")
+                    .and_then(serde_json::Value::as_str)
+                    .unwrap_or_default()
+                    .into(),
+                conflict_policy: payload
+                    .get("conflict_policy")
+                    .and_then(serde_json::Value::as_str)
+                    .unwrap_or_default()
+                    .into(),
+                reversible: payload
+                    .get("reversible")
+                    .and_then(serde_json::Value::as_bool)
+                    .unwrap_or(false),
+            };
+            return (!self.merge_strategy.evaluate(&request).accepted)
+                .then_some("merge_strategy_rejected");
+        }
+        None
     }
 }
 

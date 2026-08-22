@@ -34,7 +34,7 @@ pub const KNOWLEDGE_GRAPH_COMMANDS: &[&str] = &[
     "graph.inspect_provider",
 ];
 
-const GRAPH_PERMISSION_SCOPES: &[&str] = &[
+pub(crate) const GRAPH_PERMISSION_SCOPES: &[&str] = &[
     "graph.store.read",
     "graph.store.manage",
     "graph.schema.read",

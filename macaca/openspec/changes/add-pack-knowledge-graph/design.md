@@ -58,6 +58,25 @@ must not branch on provider names or business ontologies.
 - Do not guarantee global ACID semantics across providers; expose provider
   consistency and transaction capabilities explicitly.
 
+## Strategy Hooks
+
+The runtime-host graph bridge uses explicit Strategy interfaces for the three
+extension points that vary across graph providers:
+
+- `GraphQueryValidationStrategy` validates bounded opaque query envelopes for
+  portable, Cypher-like, SPARQL-like, Gremlin-like, GSQL-like, and
+  provider-declared modes. It does not parse or log provider-native query text.
+- `GraphImportExportStrategy` validates opaque import handles and bounded
+  provider-neutral formats (`graph_bundle`, `rdf_dataset`, `json_ld_like`, and
+  `csv_like`) before any provider adapter can read or write data.
+- `GraphMergeStrategy` evaluates reference-only merge/conflict requests and
+  emits a deterministic reversible alias reference when requested. It never
+  inspects graph values or embeds ontology-specific dedupe behavior.
+
+The service provider selects these Strategies by declared mode or format, not by
+provider name. Every rejection is emitted as a policy decision and prevents
+reference allocation, preserving traceability and fail-closed behavior.
+
 ## Ownership And Boundaries
 
 - Pack id: `pack.knowledge.graph.v1`.

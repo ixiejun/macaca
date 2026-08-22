@@ -377,6 +377,7 @@ pub use super::knowledge_graph::{
     GraphValidateSchemaCommand, RdfStatement, RdfTerm, KNOWLEDGE_GRAPH_COMMANDS,
     KNOWLEDGE_GRAPH_PACK_ID, KNOWLEDGE_GRAPH_SERVICE_ID,
 };
+pub use super::knowledge_graph_validation::validate_knowledge_graph_permission_declarations;
 pub use super::knowledge_retrieval::{
     knowledge_retrieval_descriptor_hashes, knowledge_retrieval_pack_definition,
     retrieval_stable_hash, RetrievalBulkRetrieveCommand, RetrievalCandidate, RetrievalChunk,

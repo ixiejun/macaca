@@ -162,6 +162,70 @@ async fn graph_admission_denies_policy_facts_before_reference_allocation() {
     assert_eq!(provider.snapshot().await["active_reference_count"], "0");
 }
 
+#[tokio::test]
+async fn graph_strategies_validate_query_formats_and_merge_before_allocation() {
+    let provider = GraphSystemServiceProvider::mock();
+    for (command, payload, trace, accepted) in [
+        (
+            "graph.validate_query",
+            serde_json::json!({
+                "dialect": "sparql_like",
+                "query_ref": "opaque-query",
+                "max_rows": 100
+            }),
+            "graph-valid-query",
+            true,
+        ),
+        (
+            "graph.validate_query",
+            serde_json::json!({
+                "dialect": "unknown_like",
+                "query_ref": "opaque-query",
+                "max_rows": 100
+            }),
+            "graph-invalid-query",
+            false,
+        ),
+        (
+            "graph.import_subgraph",
+            serde_json::json!({
+                "format": "json_ld_like",
+                "import_ref": "opaque-import",
+                "batch_size": 100
+            }),
+            "graph-valid-import",
+            true,
+        ),
+        (
+            "graph.export_subgraph",
+            serde_json::json!({"format": "csv_like", "max_items": 10_001}),
+            "graph-invalid-export",
+            false,
+        ),
+        (
+            "graph.merge_entities",
+            serde_json::json!({
+                "source_ref": "source",
+                "target_ref": "target",
+                "conflict_policy": "prefer_target",
+                "reversible": true
+            }),
+            "graph-valid-merge",
+            true,
+        ),
+    ] {
+        let result = provider
+            .call(ServiceCommand::with_trace(
+                ServiceCommandName::new(command),
+                payload,
+                TraceContext::new(trace),
+            ))
+            .await;
+        assert_eq!(result.is_ok(), accepted, "{command} with trace {trace}");
+    }
+    assert_eq!(provider.snapshot().await["active_reference_count"], "3");
+}
+
 fn command(name: &str, trace_id: &str) -> ServiceCommand {
     ServiceCommand::with_trace(
         ServiceCommandName::new(name),

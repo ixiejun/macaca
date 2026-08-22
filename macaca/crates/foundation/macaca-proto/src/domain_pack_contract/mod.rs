@@ -132,6 +132,7 @@ mod knowledge_common;
 mod knowledge_document_parsing;
 mod knowledge_document_parsing_preflight;
 mod knowledge_graph;
+mod knowledge_graph_validation;
 mod knowledge_retrieval;
 mod knowledge_retrieval_preflight;
 mod knowledge_search;

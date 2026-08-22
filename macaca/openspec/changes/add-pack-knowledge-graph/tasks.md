@@ -34,9 +34,9 @@
 - [x] 4.2 Add a deterministic unavailable provider that returns typed unavailable/unsupported diagnostics and complete discovery metadata.
 - [x] 4.3 Add mock provider support for property graph commands, RDF commands, query validation, traversal, path, import/export dry-run, merge conflict, provenance inspection, and provider capability inspection.
 - [x] 4.4 Add lifecycle, health, snapshot, shutdown, timeout, cancellation, bounded streaming, and paginated result behavior.
-- [ ] 4.5 Add query validation adapters as Strategy implementations for portable graph query, Cypher-like, SPARQL, Gremlin-like, GSQL-like, and provider-declared modes without hardcoding provider names in OS routing.
-- [ ] 4.6 Add import/export adapters as Strategy implementations for provider-neutral graph bundles, RDF-like datasets, JSON-LD-like documents, CSV-like loads, and paged export handles.
-- [ ] 4.7 Add merge/conflict Strategy hooks for deterministic entity merge, reversible alias mapping where possible, conflict diagnostics, and audit reasons.
+- [x] 4.5 Add query validation adapters as Strategy implementations for portable graph query, Cypher-like, SPARQL, Gremlin-like, GSQL-like, and provider-declared modes without hardcoding provider names in OS routing.
+- [x] 4.6 Add import/export adapters as Strategy implementations for provider-neutral graph bundles, RDF-like datasets, JSON-LD-like documents, CSV-like loads, and paged export handles.
+- [x] 4.7 Add merge/conflict Strategy hooks for deterministic entity merge, reversible alias mapping where possible, conflict diagnostics, and audit reasons.
 - [x] 4.8 Add provider capability reporting for available, degraded, preview, unavailable, unsupported, retired, model-specific, dialect-specific, and quota-limited states.
 
 ## 5. SDK, WASM ABI, Application Framework, And Examples
@@ -44,7 +44,7 @@
 - [x] 5.1 Extend SDK discovery for `pack.knowledge.graph.v1` with command schemas, graph models, query dialects, import/export formats, path/traversal support, examples, availability, diagnostics, documentation link, provider class, capability hash, compatibility, and redaction profile.
 - [x] 5.2 Extend application admission so required declarations block readiness when unavailable and optional declarations degrade explicitly with effective capability mementos.
 - [x] 5.3 Add SDK command helper builders for all `graph.*` commands; helpers must only build canonical traced service calls and must never construct providers or bypass policy.
-- [ ] 5.4 Extend WASM/app ABI descriptors so applications can discover graph commands, declare permissions, receive unavailable diagnostics, and submit typed service calls through the canonical execution path.
+- [x] 5.4 Extend WASM/app ABI descriptors so applications can discover graph commands, declare permissions, receive unavailable diagnostics, and submit typed service calls through the canonical execution path.
 - [x] 5.5 Add generic app-facing examples for registering a graph store, upserting a node, upserting an edge, upserting an RDF triple, validating a query, traversing from a start node, exporting a bounded subgraph, and inspecting provenance.
 - [x] 5.6 Add unavailable-provider and denied-policy examples that demonstrate diagnostics without provider names, credentials, application-specific workflows, or domain-specific ontologies.
 

@@ -287,6 +287,9 @@ mod file_service_provider_tests;
 mod git_service_provider_tests;
 #[cfg(test)]
 mod graph_service_provider_tests;
+mod graph_strategies;
+#[cfg(test)]
+mod graph_strategies_tests;
 #[cfg(test)]
 mod hook_service_provider_tests;
 #[cfg(test)]
