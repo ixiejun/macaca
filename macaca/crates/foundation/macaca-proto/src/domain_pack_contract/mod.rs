@@ -59,6 +59,7 @@ mod developer_browser_automation_validation_permissions;
 pub mod developer_ci;
 mod developer_ci_validation_permissions;
 pub mod developer_code;
+mod developer_code_validation_permissions;
 pub mod developer_common;
 pub mod developer_design_tools;
 pub mod developer_issue_tracker;

@@ -32,6 +32,32 @@ pub const DEVELOPER_CODE_COMMANDS: &[&str] = &[
     "code.inspect_provider",
 ];
 
+/// Sanitized event names emitted by runtime-host code service adapters.
+pub const DEVELOPER_CODE_TRACE_EVENTS: &[&str] = &[
+    "code_pack_declared",
+    "code_pack_admission_validated",
+    "code_workspace_inspected",
+    "code_workspace_indexed",
+    "code_document_parsed",
+    "code_symbols_found",
+    "code_references_found",
+    "code_diagnostics_reported",
+    "code_actions_discovered",
+    "code_edit_planned",
+    "code_patch_generated",
+    "code_patch_validated",
+    "code_patch_apply_requested",
+    "code_diff_inspected",
+    "code_impact_estimated",
+    "code_tests_suggested",
+    "code_scan_results_imported",
+    "code_scan_findings_inspected",
+    "code_provider_inspected",
+    "code_pack_policy_decision",
+    "code_pack_unavailable",
+    "code_pack_snapshot_recorded",
+];
+
 const CODE_PERMISSION_SCOPES: &[&str] = &[
     "code.workspace.read",
     "code.workspace.index",

@@ -1,9 +1,4 @@
-//! Stable root-level exports for the domain-pack contract module.
-//!
-//! The public `macaca_proto::*` surface historically re-exported selected
-//! provider-neutral DTOs from private implementation modules. Keeping those
-//! exports in this file preserves that API while allowing `mod.rs` to stay as
-//! the small module registry required by the OS source-size constitution.
+//! Stable root-level exports for provider-neutral domain-pack contracts.
 pub use super::catalog::{
     compose_installed_domain_pack_catalog, empty_domain_pack_catalog, snapshot_domain_pack_catalog,
     DomainPackCatalog, DomainPackCatalogSnapshot, InMemoryDomainPackCatalog,
@@ -39,7 +34,10 @@ pub use super::commerce_catalog::{
     CatalogVariantRequestCommand, PriceBook, PriceContext, COMMERCE_CATALOG_COMMANDS,
     COMMERCE_CATALOG_PACK_ID, COMMERCE_CATALOG_SERVICE_ID, COMMERCE_CATALOG_TRACE_EVENTS,
 };
-pub use super::commerce_catalog_validation_permissions::validate_commerce_catalog_permission_declarations; pub use super::commerce_common::{CommercePackCommandEnvelope, CommercePackError, CommercePackPage};
+pub use super::commerce_catalog_validation_permissions::validate_commerce_catalog_permission_declarations;
+pub use super::commerce_common::{
+    CommercePackCommandEnvelope, CommercePackError, CommercePackPage,
+};
 pub use super::commerce_entitlement::{
     commerce_entitlement_descriptor_hashes, commerce_entitlement_pack_definition,
     entitlement_stable_hash, CommerceEntitlementAssignSeatCommand,
@@ -192,6 +190,7 @@ pub use super::communication_notification::{
 };
 pub use super::developer_browser_automation_validation_permissions::validate_developer_browser_automation_permission_declarations;
 pub use super::developer_ci_validation_permissions::validate_developer_ci_permission_declarations;
+pub use super::developer_code_validation_permissions::validate_developer_code_permission_declarations;
 pub use super::device_camera_preflight::{
     admit_camera_operation, transition_camera_session, CameraPreflightFacts,
     CameraPreflightFailure, CameraSessionAction, CameraSessionState,
