@@ -267,6 +267,48 @@ async fn lifecycle_emits_stable_pack_admission_and_state_events() {
     }
 }
 
+#[tokio::test]
+async fn lifecycle_preflight_rejects_permission_timeout_cancellation_and_quota_without_resources() {
+    let cases = [
+        HostLifecyclePreflightFacts {
+            permission_granted: false,
+            ..HostLifecyclePreflightFacts::permissive()
+        },
+        HostLifecyclePreflightFacts {
+            within_timeout: false,
+            ..HostLifecyclePreflightFacts::permissive()
+        },
+        HostLifecyclePreflightFacts {
+            cancellation_requested: true,
+            ..HostLifecyclePreflightFacts::permissive()
+        },
+        HostLifecyclePreflightFacts {
+            requested_units: 4,
+            reserved_units: 1,
+            ..HostLifecyclePreflightFacts::permissive()
+        },
+    ];
+    for (index, facts) in cases.into_iter().enumerate() {
+        let provider = DeviceHostLifecycleSystemServiceProvider::mock().with_admission_facts(facts);
+        let mut events = provider.subscribe();
+        assert!(provider
+            .call(ServiceCommand::with_trace(
+                ServiceCommandName::new("host_lifecycle.request_background_lease"),
+                serde_json::json!({"host_id":"must-not-dispatch"}),
+                TraceContext::new(format!("lifecycle-preflight-{index}")),
+            ))
+            .await
+            .is_err());
+        assert_eq!(
+            events.recv().await.unwrap().command,
+            "host_lifecycle.policy_decision"
+        );
+        let snapshot = provider.snapshot().await;
+        assert_eq!(snapshot["active_foreground_session_count"], "0");
+        assert_eq!(snapshot["active_background_lease_count"], "0");
+    }
+}
+
 async fn receive_outcome(
     events: &mut tokio::sync::broadcast::Receiver<
         super::device_host_lifecycle_service_provider::HostLifecycleRuntimeEvent,

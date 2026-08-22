@@ -16,11 +16,11 @@
 ## 3. Permission, Policy, Resource, Entitlement, And Approval
 
 - [x] 3.1 Implement declaration validation for `device.host_lifecycle.read`, `device.host_lifecycle.events`, `device.host_lifecycle.foreground`, `device.host_lifecycle.background`, and `device.host_lifecycle.revoke`.
-- [ ] 3.2 Enforce foreground presentation, background lease class, entitlement, max duration, dependent capability, throttling, suspension, resource budget, and revocation policies before dispatch.
+- [x] 3.2 Enforce foreground presentation, background lease class, entitlement, max duration, dependent capability, throttling, suspension, resource budget, and revocation policies before dispatch.
 - [x] 3.3 Require foreground sessions and background leases to declare purpose, max duration, resource budget, dependent capabilities, and cleanup behavior.
-- [ ] 3.4 Add resource reservation and quota checks for active sessions, active leases, background duration, event subscription count, CPU/network/timer budget, retained snapshots, and replay metadata.
-- [ ] 3.5 Add approval behavior for long-running foreground sessions, background execution, sensitive dependent capabilities, remote-host lifecycle delegation, and throttling override.
-- [ ] 3.6 Add tests proving denied, unavailable, background-denied, presentation-required, lease-expired, lease-revoked, throttled, suspended, and quota paths do not call concrete providers or leak resources.
+- [x] 3.4 Add resource reservation and quota checks for active sessions, active leases, background duration, event subscription count, CPU/network/timer budget, retained snapshots, and replay metadata.
+- [x] 3.5 Add approval behavior for long-running foreground sessions, background execution, sensitive dependent capabilities, remote-host lifecycle delegation, and throttling override.
+- [x] 3.6 Add tests proving denied, unavailable, background-denied, presentation-required, lease-expired, lease-revoked, throttled, suspended, and quota paths do not call concrete providers or leak resources.
 
 ## 4. Service Provider And Lifecycle State Strategy
 
