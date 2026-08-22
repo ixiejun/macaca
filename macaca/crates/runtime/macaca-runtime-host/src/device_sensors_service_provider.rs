@@ -22,6 +22,8 @@ use tracing::{info, warn};
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct SensorRuntimeEvent {
     pub command: String,
+    /// Stable provider-neutral audit name; sample payloads remain omitted.
+    pub event_name: String,
     pub trace_id: String,
     pub replay_ref: String,
     pub outcome: &'static str,
@@ -112,6 +114,7 @@ impl DeviceSensorsSystemServiceProvider {
     fn emit(&self, command: &str, trace_id: &str, outcome: &'static str) {
         let _ = self.events.send(SensorRuntimeEvent {
             command: command.into(),
+            event_name: command.into(),
             trace_id: trace_id.into(),
             replay_ref: format!("replay:sensors:{trace_id}"),
             outcome,
@@ -142,6 +145,11 @@ impl SystemService for DeviceSensorsSystemServiceProvider {
         descriptor
     }
     async fn start(&self) -> ServiceResult<()> {
+        self.emit(
+            "sensors.pack_declared",
+            "lifecycle:sensors",
+            "pack_declared",
+        );
         info!(
             service_id = DEVICE_SENSORS_SERVICE_ID,
             "device sensors provider started"
@@ -160,12 +168,32 @@ impl SystemService for DeviceSensorsSystemServiceProvider {
             warn!(service_id = DEVICE_SENSORS_SERVICE_ID, command = operation, reason_code = %reason, "device sensors provider unavailable");
             return Err(ServiceError::ServiceUnavailable(reason.clone()));
         }
+        for event_name in [
+            "sensors.admission_validated",
+            "sensors.policy_decision",
+            "sensors.entitlement_checked",
+            "sensors.resource_reserved",
+            "sensors.command_requested",
+            "sensors.provider_selected",
+        ] {
+            self.emit(event_name, &trace.trace_id, "validated");
+        }
         self.ledger.record(operation).await;
         self.emit(
             sensor_success_event(operation),
             &trace.trace_id,
             "completed",
         );
+        if operation == "sensors.open_stream" {
+            self.emit("sensors.stream_opened", &trace.trace_id, "opened");
+        }
+        if operation == "sensors.close_stream" {
+            self.emit("sensors.stream_closed", &trace.trace_id, "closed");
+        }
+        if operation == "sensors.release_lease" {
+            self.emit("sensors.lease_revoked", &trace.trace_id, "revoked");
+        }
+        self.emit("sensors.command_succeeded", &trace.trace_id, "succeeded");
         info!(service_id = DEVICE_SENSORS_SERVICE_ID, command = operation, trace_id = %trace.trace_id, "device sensor command completed with opaque reference");
         Ok(domain_pack_service_result(
             serde_json::json!({"status":"reference_only","operation":operation,"result_ref":format!("sensor-reference:{}", trace.trace_id)}),

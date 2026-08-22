@@ -78,3 +78,46 @@ async fn sensor_replay_reference_is_stable_after_provider_restart() {
     assert_eq!(event.trace_id, trace_id);
     assert_eq!(event.replay_ref, format!("replay:sensors:{trace_id}"));
 }
+
+#[tokio::test]
+async fn sensors_emit_stable_audit_event_taxonomy() {
+    let provider = DeviceSensorsSystemServiceProvider::mock();
+    let mut events = provider.subscribe();
+    provider.start().await.unwrap();
+    for command in [
+        "sensors.open_stream",
+        "sensors.read_stream",
+        "sensors.release_lease",
+    ] {
+        provider
+            .call(ServiceCommand::with_trace(
+                ServiceCommandName::new(command),
+                serde_json::json!({"sample_vector":"redacted"}),
+                TraceContext::new(command),
+            ))
+            .await
+            .unwrap();
+    }
+    let mut names = Vec::new();
+    while let Ok(event) = events.try_recv() {
+        names.push(event.event_name);
+    }
+    for expected in [
+        "sensors.pack_declared",
+        "sensors.admission_validated",
+        "sensors.policy_decision",
+        "sensors.entitlement_checked",
+        "sensors.resource_reserved",
+        "sensors.command_requested",
+        "sensors.provider_selected",
+        "sensors.stream_opened",
+        "sensors.stream_chunk_delivered",
+        "sensors.lease_revoked",
+        "sensors.command_succeeded",
+    ] {
+        assert!(
+            names.iter().any(|name| name == expected),
+            "missing {expected}"
+        );
+    }
+}
