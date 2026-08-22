@@ -430,6 +430,7 @@ pub use super::knowledge_summarization_preflight::{
     SummarizationAdmissionEvidence, SummarizationDispatchPreflight,
 };
 pub use super::location_place_search_validation_permissions::validate_location_place_search_permission_declarations;
+pub use super::location_timezone_validation_permissions::validate_location_timezone_permission_declarations;
 pub use super::media_audio_preflight::{
     admit_audio_operation, AudioPreflightFacts, AudioPreflightFailure,
 };

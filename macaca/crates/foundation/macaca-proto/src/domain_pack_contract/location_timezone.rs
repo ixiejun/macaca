@@ -11,6 +11,20 @@ use super::model::{DomainPackDefinition, DomainPackProviderCapabilityState};
 
 pub const LOCATION_TIMEZONE_PACK_ID: &str = "pack.location.timezone.v1";
 pub const LOCATION_TIMEZONE_SERVICE_ID: &str = "service.location.timezone";
+pub const LOCATION_TIMEZONE_TRACE_EVENTS: &[&str] = &[
+    "timezone.pack_declared",
+    "timezone.admission_validated",
+    "timezone.policy_decision",
+    "timezone.entitlement_checked",
+    "timezone.resource_reserved",
+    "timezone.command_requested",
+    "timezone.provider_selected",
+    "timezone.command_succeeded",
+    "timezone.command_failed",
+    "timezone.unavailable",
+    "timezone.database_stale",
+    "timezone.snapshot_recorded",
+];
 
 pub const LOCATION_TIMEZONE_COMMANDS: &[&str] = &[
     "timezone.lookup_by_coordinates",
@@ -24,7 +38,7 @@ pub const LOCATION_TIMEZONE_COMMANDS: &[&str] = &[
     "timezone.inspect_mapping",
 ];
 
-const TIMEZONE_PERMISSION_SCOPES: &[&str] = &[
+pub const TIMEZONE_PERMISSION_SCOPES: &[&str] = &[
     "location.timezone.lookup.read",
     "location.timezone.offset.read",
     "location.timezone.names.read",

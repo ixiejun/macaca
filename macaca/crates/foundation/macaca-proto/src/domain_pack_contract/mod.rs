@@ -150,6 +150,7 @@ pub mod location_place_search;
 mod location_place_search_validation_permissions;
 pub mod location_route;
 pub mod location_timezone;
+mod location_timezone_validation_permissions;
 pub mod media_audio;
 pub mod media_audio_preflight;
 mod media_audio_validation;

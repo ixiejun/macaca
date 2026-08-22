@@ -16,36 +16,36 @@
 ## 3. Permission, Policy, Resource, Entitlement, And Approval
 
 - [x] 3.1 Implement declaration validation for `location.timezone.lookup.read`, `location.timezone.offset.read`, `location.timezone.names.read`, and `location.timezone.database.inspect`.
-- [ ] 3.2 Enforce coordinate precision, spatial redaction, region, data freshness, retention, provider-class, identifier-system, and bounded range policies before dispatch.
-- [ ] 3.3 Require explicit local-time resolver strategy for gap/fold handling: reject, earlier, later, compatible, or explicit offset.
-- [ ] 3.4 Add resource reservation and quota checks for remote calls, transition-list range, page size, boundary dataset access, display-name lookup, retained snapshots, and replay metadata.
-- [ ] 3.5 Add approval behavior for precise coordinate lookup, host-native provider access, external network disclosure, stale data override, and high-volume transition queries.
-- [ ] 3.6 Add tests proving denied, unavailable, unsupported, stale-database, and quota paths do not call concrete providers.
+- [x] 3.2 Enforce coordinate precision, spatial redaction, region, data freshness, retention, provider-class, identifier-system, and bounded range policies before dispatch.
+- [x] 3.3 Require explicit local-time resolver strategy for gap/fold handling: reject, earlier, later, compatible, or explicit offset.
+- [x] 3.4 Add resource reservation and quota checks for remote calls, transition-list range, page size, boundary dataset access, display-name lookup, retained snapshots, and replay metadata.
+- [x] 3.5 Add approval behavior for precise coordinate lookup, host-native provider access, external network disclosure, stale data override, and high-volume transition queries.
+- [x] 3.6 Add tests proving denied, unavailable, unsupported, stale-database, and quota paths do not call concrete providers.
 
 ## 4. Service Provider And Replacement Strategy
 
-- [ ] 4.1 Implement the timezone service provider contract behind the service runtime; do not construct providers from kernel, SDK, shells, or generic application-framework code.
+- [x] 4.1 Implement the timezone service provider contract behind the service runtime; do not construct providers from kernel, SDK, shells, or generic application-framework code.
 - [x] 4.2 Add provider descriptor support for embedded tzdb, boundary lookup, remote API, host-native, display-name, mock, and unavailable provider classes.
 - [x] 4.3 Add mock and unavailable providers for deterministic tests; external supplier adapters must remain optional providers or plugin/remote modules.
-- [ ] 4.4 Add provider conformance tests for coordinate lookup, alias resolution, Windows/IANA mapping, offset calculation, transition listing, instant conversion, local gap/fold resolution, display names, database inspection, redaction, and unsupported-command reporting.
-- [ ] 4.5 Add lifecycle, health, snapshot, shutdown, timeout, cancellation, dataset refresh, stale-database reporting, and bounded output behavior.
+- [x] 4.4 Add provider conformance tests for coordinate lookup, alias resolution, Windows/IANA mapping, offset calculation, transition listing, instant conversion, local gap/fold resolution, display names, database inspection, redaction, and unsupported-command reporting.
+- [x] 4.5 Add lifecycle, health, snapshot, shutdown, timeout, cancellation, dataset refresh, stale-database reporting, and bounded output behavior.
 
 ## 5. SDK, Admission, Examples, And ABI
 
 - [x] 5.1 Extend SDK discovery for `pack.location.timezone.v1` with command schemas, DTO schemas, permission scopes, examples, availability, provider classes, database versions, freshness, diagnostics, compatibility, and documentation URL.
-- [ ] 5.2 Extend application admission so required declarations block when unavailable or stale beyond policy and optional declarations degrade explicitly with effective capability mementos.
+- [x] 5.2 Extend application admission so required declarations block when unavailable or stale beyond policy and optional declarations degrade explicitly with effective capability mementos.
 - [x] 5.3 Add SDK command helper builders that only produce canonical traced service calls and never construct providers or branch on provider names.
-- [ ] 5.4 Add WASM/application ABI exposure for timezone commands using provider-neutral DTO schemas and canonical service-call dispatch.
+- [x] 5.4 Add WASM/application ABI exposure for timezone commands using provider-neutral DTO schemas and canonical service-call dispatch.
 - [x] 5.5 Add generic examples for coordinate lookup, zone normalization, offset calculation, transition listing, instant conversion, local-time gap/fold resolution, display names, database inspection, and unavailable diagnostics.
 
 ## 6. Trace, Audit, Replay, And Boundary Gates
 
-- [ ] 6.1 Emit sanitized `timezone.pack_declared`, `timezone.admission_validated`, `timezone.policy_decision`, `timezone.entitlement_checked`, `timezone.resource_reserved`, `timezone.command_requested`, `timezone.provider_selected`, `timezone.command_succeeded`, `timezone.command_failed`, `timezone.unavailable`, `timezone.database_stale`, and `timezone.snapshot_recorded` events.
-- [ ] 6.2 Add replay tests proving every command is trace-addressable through the canonical service path after refresh/restart and includes database-version evidence.
-- [ ] 6.3 Add dependency-boundary gates proving microkernel, SDK, shells, and generic application framework do not import concrete timezone providers or embedded tzdb loaders.
-- [ ] 6.4 Add no-direct-provider-call gates proving all timezone commands enter through descriptor-owned service registrations and typed service runtime dispatch.
-- [ ] 6.5 Add redaction tests for exact coordinates, raw provider payloads, raw boundary geometry, credentials, database paths, host identifiers, snapshots, and stale-database diagnostics.
-- [ ] 6.6 Run `openspec validate add-pack-location-timezone --strict`, DTO compatibility tests, DST gap/fold conformance tests, tzdb version tests, boundary gates, file-size gates, and audit replay checks before marking implementation tasks complete.
+- [x] 6.1 Emit sanitized `timezone.pack_declared`, `timezone.admission_validated`, `timezone.policy_decision`, `timezone.entitlement_checked`, `timezone.resource_reserved`, `timezone.command_requested`, `timezone.provider_selected`, `timezone.command_succeeded`, `timezone.command_failed`, `timezone.unavailable`, `timezone.database_stale`, and `timezone.snapshot_recorded` events.
+- [x] 6.2 Add replay tests proving every command is trace-addressable through the canonical service path after refresh/restart and includes database-version evidence.
+- [x] 6.3 Add dependency-boundary gates proving microkernel, SDK, shells, and generic application framework do not import concrete timezone providers or embedded tzdb loaders.
+- [x] 6.4 Add no-direct-provider-call gates proving all timezone commands enter through descriptor-owned service registrations and typed service runtime dispatch.
+- [x] 6.5 Add redaction tests for exact coordinates, raw provider payloads, raw boundary geometry, credentials, database paths, host identifiers, snapshots, and stale-database diagnostics.
+- [x] 6.6 Run `openspec validate add-pack-location-timezone --strict`, DTO compatibility tests, DST gap/fold conformance tests, tzdb version tests, boundary gates, file-size gates, and audit replay checks before marking implementation tasks complete.
 
 ## 7. Developer Documentation
 
