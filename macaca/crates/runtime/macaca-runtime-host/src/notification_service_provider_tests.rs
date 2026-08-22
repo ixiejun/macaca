@@ -389,62 +389,6 @@ async fn notification_action_callback_is_trace_addressable() {
     assert_eq!(event.trace_id, "trace-notification-action");
 }
 
-#[tokio::test]
-async fn notification_provider_emits_complete_sanitized_audit_taxonomy() {
-    let provider = NotificationSystemServiceProvider::mock();
-    let mut events = provider.subscribe();
-    provider.start().await.unwrap();
-    provider
-        .call(ServiceCommand::with_trace(
-            ServiceCommandName::new("notification.publish"),
-            serde_json::json!({}),
-            TraceContext::new("trace-notification-audit"),
-        ))
-        .await
-        .unwrap();
-    provider.health().await.unwrap();
-    provider.snapshot().await;
-    let unavailable = NotificationSystemServiceProvider::unavailable("not-installed");
-    let mut unavailable_events = unavailable.subscribe();
-    let _ = unavailable
-        .call(ServiceCommand::with_trace(
-            ServiceCommandName::new("notification.publish"),
-            serde_json::json!({}),
-            TraceContext::new("trace-notification-unavailable"),
-        ))
-        .await;
-    assert_eq!(
-        receive_kind(
-            &mut unavailable_events,
-            NotificationRuntimeEventKind::Unavailable
-        )
-        .await
-        .kind,
-        NotificationRuntimeEventKind::Unavailable
-    );
-    let mut emitted = Vec::new();
-    for _ in 0..13 {
-        emitted.push(events.recv().await.unwrap().kind);
-    }
-    for kind in [
-        NotificationRuntimeEventKind::PackDeclared,
-        NotificationRuntimeEventKind::AdmissionValidated,
-        NotificationRuntimeEventKind::ConsentChecked,
-        NotificationRuntimeEventKind::PolicyDecision,
-        NotificationRuntimeEventKind::ResourceReserved,
-        NotificationRuntimeEventKind::EntitlementChecked,
-        NotificationRuntimeEventKind::ApprovalChecked,
-        NotificationRuntimeEventKind::ServiceCall,
-        NotificationRuntimeEventKind::ProviderCallStarted,
-        NotificationRuntimeEventKind::ProviderCallSucceeded,
-        NotificationRuntimeEventKind::DeliveryStatusChanged,
-        NotificationRuntimeEventKind::HealthReported,
-        NotificationRuntimeEventKind::SnapshotRecorded,
-    ] {
-        assert!(emitted.contains(&kind));
-    }
-}
-
 async fn receive_kind(
     events: &mut tokio::sync::broadcast::Receiver<
         super::notification_service_provider::NotificationRuntimeEvent,
@@ -497,19 +441,4 @@ async fn dispatch_notification(
         )
         .await
         .unwrap();
-}
-
-#[test]
-fn notification_delivery_status_remains_bounded() {
-    let statuses = [
-        NotificationDeliveryStatus::Accepted,
-        NotificationDeliveryStatus::Scheduled,
-        NotificationDeliveryStatus::Canceled,
-        NotificationDeliveryStatus::Acknowledged,
-        NotificationDeliveryStatus::Dismissed,
-        NotificationDeliveryStatus::Delivered,
-    ];
-    assert!(statuses
-        .iter()
-        .all(|status| format!("{:?}", status).len() < 32));
 }

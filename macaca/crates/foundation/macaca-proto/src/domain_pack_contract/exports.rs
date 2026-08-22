@@ -203,6 +203,7 @@ pub use super::expansion::{
     expand_service_capabilities, DomainPackEffectiveCapabilityProjection,
     EffectiveServiceCapabilities,
 };
+pub use super::exports_foundation_filesystem::*;
 pub use super::finance_common::{FinanceCommandEnvelope, FinanceError, FinancePage};
 pub use super::foundation_config::{
     config_stable_hash, foundation_config_descriptor_hashes, foundation_config_pack_definition,
@@ -222,28 +223,6 @@ pub use super::foundation_config_semantics::{
     ConfigAdmissionRequest, ConfigAuditFields, ConfigPolicyContext, ConfigResourceLimits,
     ConfigResourceReservation,
 };
-pub use super::foundation_filesystem::{
-    filesystem_stable_hash, foundation_filesystem_descriptor_hashes,
-    foundation_filesystem_pack_definition, FilesystemAccessMode, FilesystemAppendFileCommand,
-    FilesystemCloseHandleCommand, FilesystemConflictMode, FilesystemContentRef,
-    FilesystemCopyPathCommand, FilesystemCreateDirectoryCommand, FilesystemCreateTempCommand,
-    FilesystemDeletePathCommand, FilesystemDescriptorHashes, FilesystemError, FilesystemHandleRef,
-    FilesystemListDirectoryCommand, FilesystemMetadata, FilesystemMovePathCommand,
-    FilesystemOpenHandleCommand, FilesystemPathRef, FilesystemProviderCapability,
-    FilesystemProviderSnapshot, FilesystemReadFileCommand, FilesystemRestoreSnapshotCommand,
-    FilesystemResultEnvelope, FilesystemResultStatus, FilesystemRootRef, FilesystemSnapshotRef,
-    FilesystemSnapshotTreeCommand, FilesystemStatPathCommand, FilesystemWatchEvent,
-    FilesystemWatchPathCommand, FilesystemWriteFileCommand, FOUNDATION_FILESYSTEM_COMMANDS,
-    FOUNDATION_FILESYSTEM_PACK_ID, FOUNDATION_FILESYSTEM_SERVICE_ID,
-};
-pub use super::foundation_filesystem_semantics::{
-    dispatch_after_preflight as dispatch_filesystem_after_preflight,
-    preflight_command as preflight_filesystem_command, redacted_filesystem_audit_fields,
-    reserve as reserve_filesystem_resources, FilesystemAdmissionFailure,
-    FilesystemAdmissionRequest, FilesystemAuditFields, FilesystemPolicyContext,
-    FilesystemResourceLimits, FilesystemResourceReservation,
-};
-pub use super::foundation_filesystem_validation::validate_filesystem_root_declarations;
 pub use super::foundation_key_value_state::{
     foundation_key_value_state_descriptor_hashes, foundation_key_value_state_pack_definition,
     key_value_state_stable_hash, KeyValueBatchDeleteCommand, KeyValueBatchGetCommand,

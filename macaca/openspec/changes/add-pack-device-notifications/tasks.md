@@ -46,7 +46,7 @@
 - [x] 6.3 Add dependency-boundary gates proving microkernel, SDK, shells, and generic application framework do not import concrete notification providers or host notification APIs.
 - [x] 6.4 Add no-direct-provider-call gates proving all notification commands enter through descriptor-owned service registrations and typed service runtime dispatch.
 - [x] 6.5 Add redaction tests for title/body text, action input, push tokens, provider payloads, credentials, notification history, interaction events, snapshots, and diagnostics.
-- [ ] 6.6 Run `openspec validate add-pack-device-notifications --strict`, DTO compatibility tests, authorization tests, scheduling tests, interaction replay tests, boundary gates, file-size gates, and audit replay checks before marking implementation tasks complete.
+- [x] 6.6 Run `openspec validate add-pack-device-notifications --strict`, DTO compatibility tests, authorization tests, scheduling tests, interaction replay tests, boundary gates, file-size gates, and audit replay checks before marking implementation tasks complete.
 
 ## 7. Developer Documentation
 

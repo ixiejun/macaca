@@ -308,6 +308,8 @@ mod llm_service_provider_hardening_tests;
 #[cfg(test)]
 mod messaging_service_provider_tests;
 #[cfg(test)]
+mod notification_service_provider_lifecycle_tests;
+#[cfg(test)]
 mod notification_service_provider_tests;
 #[cfg(test)]
 mod plugin_marketplace_service_provider_tests;

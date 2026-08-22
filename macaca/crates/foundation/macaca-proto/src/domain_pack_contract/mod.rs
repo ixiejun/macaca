@@ -72,6 +72,7 @@ pub mod device_sensors;
 mod device_validation;
 mod expansion;
 mod exports;
+mod exports_foundation_filesystem;
 pub mod finance_accounting;
 mod finance_accounting_bounds;
 mod finance_accounting_commands;
