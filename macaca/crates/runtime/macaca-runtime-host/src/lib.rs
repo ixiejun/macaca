@@ -126,6 +126,7 @@ pub mod media_audio_service_provider;
 mod media_audio_service_state;
 pub mod media_transcription_service_provider;
 mod media_transcription_service_state;
+mod media_transcription_strategy;
 pub mod memory_service_provider;
 pub mod messaging_service_provider;
 pub mod notification_service_provider;
@@ -158,6 +159,7 @@ mod foundation_session_state_service_provider_tests;
 mod local_files_policy;
 #[cfg(test)]
 mod media_audio_service_provider_tests;
+mod media_transcription_policy_tests;
 #[cfg(test)]
 mod media_transcription_service_provider_tests;
 pub mod plugin;

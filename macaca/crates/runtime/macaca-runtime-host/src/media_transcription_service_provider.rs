@@ -25,6 +25,9 @@ use macaca_proto::{
 use tracing::{info, warn};
 
 use crate::media_transcription_service_state::TranscriptionSideEffectLedger;
+use crate::media_transcription_strategy::{
+    ConfiguredMediaTranscriptionStrategy, MediaTranscriptionStrategy,
+};
 
 /// Bounded event used for audit/replay evidence; source and transcript payloads are absent.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -43,6 +46,7 @@ pub struct MediaTranscriptionSystemServiceProvider {
     events: tokio::sync::broadcast::Sender<TranscriptionRuntimeEvent>,
     side_effects: Arc<TranscriptionSideEffectLedger>,
     admission_facts: TranscriptionPreflightFacts,
+    strategy: Arc<dyn MediaTranscriptionStrategy>,
 }
 
 impl MediaTranscriptionSystemServiceProvider {
@@ -58,11 +62,18 @@ impl MediaTranscriptionSystemServiceProvider {
 
     fn new(unavailable_reason: Option<String>) -> Self {
         let (events, _) = tokio::sync::broadcast::channel(256);
+        let strategy: Arc<dyn MediaTranscriptionStrategy> =
+            Arc::new(if unavailable_reason.is_some() {
+                ConfiguredMediaTranscriptionStrategy::unavailable()
+            } else {
+                ConfiguredMediaTranscriptionStrategy::mock()
+            });
         Self {
             unavailable_reason,
             events,
             side_effects: Arc::new(TranscriptionSideEffectLedger::default()),
             admission_facts: TranscriptionPreflightFacts::permissive(),
+            strategy,
         }
     }
 
@@ -75,26 +86,7 @@ impl MediaTranscriptionSystemServiceProvider {
 
     /// Report only descriptor-owned capability facts and never provider internals.
     pub fn capability(&self) -> TranscriptionProviderCapability {
-        TranscriptionProviderCapability {
-            provider_class: if self.unavailable_reason.is_some() {
-                "unavailable"
-            } else {
-                "mock"
-            }
-            .into(),
-            languages: BTreeSet::from(["und".into()]),
-            model_classes: BTreeSet::from(["provider-neutral".into()]),
-            features: if self.unavailable_reason.is_some() {
-                BTreeSet::new()
-            } else {
-                BTreeSet::from(["metadata_only".into()])
-            },
-            state: if self.unavailable_reason.is_some() {
-                DomainPackProviderCapabilityState::Unavailable
-            } else {
-                DomainPackProviderCapabilityState::Preview
-            },
-        }
+        self.strategy.capability()
     }
 
     /// Subscribe to sanitized events that carry no audio, chunk, or transcript data.
@@ -191,6 +183,7 @@ impl SystemService for MediaTranscriptionSystemServiceProvider {
             );
             return Err(ServiceError::UnsupportedCommand(operation.into()));
         }
+        self.strategy.validate(operation)?;
         if let Some(reason) = &self.unavailable_reason {
             self.emit("transcription.unavailable", &trace.trace_id, "unavailable");
             warn!(service_id = MEDIA_TRANSCRIPTION_SERVICE_ID, command = operation, trace_id = %trace.trace_id, reason_code = %reason, "media transcription provider unavailable");
@@ -212,6 +205,10 @@ impl SystemService for MediaTranscriptionSystemServiceProvider {
                 "payload_rejected",
             );
             return Err(ServiceError::DisabledByPolicy(reason.into()));
+        }
+        if let Some(reason) = transcription_request_bounds(operation, &command.payload) {
+            self.emit("transcription.resource", &trace.trace_id, "bounds_rejected");
+            return Err(ServiceError::AdapterFailure(reason.into()));
         }
         if let Err(error) = TranscriptionSideEffectLedger::validate_source_version(&command) {
             self.emit(
@@ -299,6 +296,50 @@ fn transcription_payload_denial(
                     .is_some_and(|index| index > 1024))
             .then_some("chunk_quota_exceeded")
         })
+}
+
+/// Enforce bounded source/session/output metadata before any ledger mutation.
+fn transcription_request_bounds(
+    operation: &str,
+    payload: &serde_json::Value,
+) -> Option<&'static str> {
+    let max_duration_seconds = payload
+        .get("duration_seconds")
+        .and_then(serde_json::Value::as_u64)
+        .is_some_and(|value| value > 86_400);
+    let max_channels = payload
+        .get("channel_count")
+        .and_then(serde_json::Value::as_u64)
+        .is_some_and(|value| value > 64);
+    let max_chunk_bytes = payload
+        .get("chunk_bytes")
+        .and_then(serde_json::Value::as_u64)
+        .is_some_and(|value| value > 1_048_576);
+    let max_transcript_tokens = payload
+        .get("transcript_token_count")
+        .and_then(serde_json::Value::as_u64)
+        .is_some_and(|value| value > 1_000_000);
+    let external_delivery_without_approval = payload
+        .get("external_delivery")
+        .and_then(serde_json::Value::as_bool)
+        == Some(true)
+        && payload
+            .get("approval_granted")
+            .and_then(serde_json::Value::as_bool)
+            != Some(true);
+    if max_duration_seconds {
+        return Some("transcription_duration_limit");
+    }
+    if max_channels {
+        return Some("transcription_channel_limit");
+    }
+    if operation == "transcription.append_stream_chunk" && max_chunk_bytes {
+        return Some("transcription_chunk_size_limit");
+    }
+    if max_transcript_tokens {
+        return Some("transcription_token_limit");
+    }
+    external_delivery_without_approval.then_some("transcription_external_delivery_approval")
 }
 
 /// Map lifecycle markers and commands to stable sanitized audit vocabulary.
