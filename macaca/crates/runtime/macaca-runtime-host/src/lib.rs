@@ -85,6 +85,7 @@ pub mod diagnostics_service_provider;
 pub mod document_parsing_service_provider;
 mod domain_pack_provider_replacement;
 pub mod domain_pack_service_provider;
+pub mod domain_pack_simple_provider;
 pub mod driver_service_bootstrap;
 pub mod driver_service_provider;
 pub mod email_service_provider;
@@ -114,6 +115,23 @@ pub mod finance_crypto_service_provider;
 pub mod finance_crypto_strategy;
 pub mod finance_market_data_service_provider;
 pub mod finance_market_data_strategy;
+pub use domain_pack_simple_provider::{
+    commerce_entitlement::CommerceEntitlementSystemServiceProvider,
+    commerce_receipt::CommerceReceiptSystemServiceProvider,
+    finance_invoice::FinanceInvoiceSystemServiceProvider,
+    finance_portfolio::FinancePortfolioSystemServiceProvider,
+    finance_stock::FinanceStockSystemServiceProvider,
+    location_geocode::LocationGeocodeSystemServiceProvider,
+    location_maps::LocationMapsSystemServiceProvider,
+    location_route::LocationRouteSystemServiceProvider,
+    media_image::MediaImageSystemServiceProvider,
+    media_rendering::MediaRenderingSystemServiceProvider,
+    media_video::MediaVideoSystemServiceProvider,
+    office_document::OfficeDocumentSystemServiceProvider,
+    office_forms::OfficeFormsSystemServiceProvider, office_pdf::OfficePdfSystemServiceProvider,
+    office_presentation::OfficePresentationSystemServiceProvider,
+    office_spreadsheet::OfficeSpreadsheetSystemServiceProvider,
+};
 pub mod foundation_config_service_provider;
 pub mod foundation_filesystem_service_provider;
 pub mod foundation_key_value_state_service_provider;
