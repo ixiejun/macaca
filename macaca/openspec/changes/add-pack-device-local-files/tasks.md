@@ -43,8 +43,8 @@
 
 - [ ] 6.1 Emit sanitized `local_files.pack_declared`, `local_files.admission_validated`, `local_files.policy_decision`, `local_files.entitlement_checked`, `local_files.resource_reserved`, `local_files.picker_requested`, `local_files.handle_granted`, `local_files.handle_revoked`, `local_files.transfer_started`, `local_files.transfer_progressed`, `local_files.transfer_completed`, `local_files.transfer_cancelled`, `local_files.command_failed`, `local_files.unavailable`, and `local_files.snapshot_recorded` events.
 - [ ] 6.2 Add replay tests proving every command is trace-addressable through the canonical service path after refresh/restart without raw file contents or raw host paths.
-- [ ] 6.3 Add dependency-boundary gates proving microkernel, SDK, shells, and generic application framework do not import concrete local file providers or host file APIs.
-- [ ] 6.4 Add no-direct-provider-call gates proving all local file commands enter through descriptor-owned service registrations and typed service runtime dispatch.
+- [x] 6.3 Add dependency-boundary gates proving microkernel, SDK, shells, and generic application framework do not import concrete local file providers or host file APIs.
+- [x] 6.4 Add no-direct-provider-call gates proving all local file commands enter through descriptor-owned service registrations and typed service runtime dispatch.
 - [x] 6.5 Add redaction tests for raw host paths, raw file contents, file names when policy forbids them, provider payloads, credentials, transfer chunks, handles, snapshots, and diagnostics.
 - [ ] 6.6 Run `openspec validate add-pack-device-local-files --strict`, DTO compatibility tests, grant lifecycle tests, bounded transfer tests, revocation tests, boundary gates, file-size gates, and audit replay checks before marking implementation tasks complete.
 
