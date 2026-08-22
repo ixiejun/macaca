@@ -73,7 +73,10 @@ async fn lifecycle_commands_are_traceable_and_redacted() {
             .unwrap();
         assert_eq!(result.output["status"], "reference_only");
         assert!(!result.output.to_string().contains(marker));
-        assert_eq!(events.recv().await.unwrap().outcome, "completed");
+        assert_eq!(
+            receive_outcome(&mut events, "completed").await.outcome,
+            "completed"
+        );
     }
 }
 
@@ -222,4 +225,58 @@ async fn lifecycle_replay_reference_is_stable_after_provider_restart() {
         event.replay_ref,
         format!("replay:host-lifecycle:{trace_id}")
     );
+}
+
+#[tokio::test]
+async fn lifecycle_emits_stable_pack_admission_and_state_events() {
+    let provider = DeviceHostLifecycleSystemServiceProvider::mock();
+    let mut events = provider.subscribe();
+    provider.start().await.unwrap();
+    for command in [
+        "host_lifecycle.open_foreground_session",
+        "host_lifecycle.request_background_lease",
+        "host_lifecycle.inspect_policy",
+        "host_lifecycle.revoke",
+    ] {
+        provider
+            .call(ServiceCommand::with_trace(
+                ServiceCommandName::new(command),
+                serde_json::json!({"host_id":"redacted"}),
+                TraceContext::new(command),
+            ))
+            .await
+            .unwrap();
+    }
+    let mut names = Vec::new();
+    while let Ok(event) = events.try_recv() {
+        names.push(event.event_name);
+    }
+    for expected in [
+        "host_lifecycle.pack_declared",
+        "host_lifecycle.admission_validated",
+        "host_lifecycle.policy_decision",
+        "host_lifecycle.state_changed",
+        "host_lifecycle.background_lease_granted",
+        "host_lifecycle.throttle_changed",
+        "host_lifecycle.session_or_lease_revoked",
+    ] {
+        assert!(
+            names.iter().any(|name| name == expected),
+            "missing {expected}"
+        );
+    }
+}
+
+async fn receive_outcome(
+    events: &mut tokio::sync::broadcast::Receiver<
+        super::device_host_lifecycle_service_provider::HostLifecycleRuntimeEvent,
+    >,
+    expected: &str,
+) -> super::device_host_lifecycle_service_provider::HostLifecycleRuntimeEvent {
+    loop {
+        let event = events.recv().await.unwrap();
+        if event.outcome == expected {
+            return event;
+        }
+    }
 }

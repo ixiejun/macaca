@@ -41,7 +41,7 @@
 
 ## 6. Trace, Audit, Replay, And Boundary Gates
 
-- [ ] 6.1 Emit sanitized `host_lifecycle.pack_declared`, `host_lifecycle.admission_validated`, `host_lifecycle.policy_decision`, `host_lifecycle.state_changed`, `host_lifecycle.foreground_session_opened`, `host_lifecycle.foreground_session_closed`, `host_lifecycle.background_lease_requested`, `host_lifecycle.background_lease_granted`, `host_lifecycle.background_lease_released`, `host_lifecycle.session_or_lease_revoked`, `host_lifecycle.throttle_changed`, `host_lifecycle.command_failed`, `host_lifecycle.unavailable`, and `host_lifecycle.snapshot_recorded` events.
+- [x] 6.1 Emit sanitized `host_lifecycle.pack_declared`, `host_lifecycle.admission_validated`, `host_lifecycle.policy_decision`, `host_lifecycle.state_changed`, `host_lifecycle.foreground_session_opened`, `host_lifecycle.foreground_session_closed`, `host_lifecycle.background_lease_requested`, `host_lifecycle.background_lease_granted`, `host_lifecycle.background_lease_released`, `host_lifecycle.session_or_lease_revoked`, `host_lifecycle.throttle_changed`, `host_lifecycle.command_failed`, `host_lifecycle.unavailable`, and `host_lifecycle.snapshot_recorded` events.
 - [x] 6.2 Add replay tests proving every command and lifecycle event is trace-addressable through the canonical service path after refresh/restart.
 - [x] 6.3 Add dependency-boundary gates proving microkernel, SDK, shells, and generic application framework do not import concrete lifecycle providers or host lifecycle APIs.
 - [x] 6.4 Add no-direct-provider-call gates proving all host lifecycle commands enter through descriptor-owned service registrations and typed service runtime dispatch.

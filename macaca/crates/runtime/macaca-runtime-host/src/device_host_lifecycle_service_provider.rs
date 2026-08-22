@@ -24,6 +24,8 @@ use tracing::{info, warn};
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct HostLifecycleRuntimeEvent {
     pub command: String,
+    /// Stable provider-neutral audit name; host identifiers and lifecycle logs are omitted.
+    pub event_name: String,
     pub trace_id: String,
     pub replay_ref: String,
     pub outcome: &'static str,
@@ -139,6 +141,7 @@ impl DeviceHostLifecycleSystemServiceProvider {
     fn emit(&self, command: &str, trace_id: &str, outcome: &'static str) {
         let _ = self.events.send(HostLifecycleRuntimeEvent {
             command: command.into(),
+            event_name: command.into(),
             trace_id: trace_id.into(),
             replay_ref: format!("replay:host-lifecycle:{trace_id}"),
             outcome,
@@ -174,6 +177,11 @@ impl SystemService for DeviceHostLifecycleSystemServiceProvider {
         descriptor
     }
     async fn start(&self) -> ServiceResult<()> {
+        self.emit(
+            "host_lifecycle.pack_declared",
+            "lifecycle:host-lifecycle",
+            "pack_declared",
+        );
         info!(
             service_id = DEVICE_FOREGROUND_BACKGROUND_HOST_SERVICE_ID,
             "device host lifecycle provider started"
@@ -205,12 +213,33 @@ impl SystemService for DeviceHostLifecycleSystemServiceProvider {
             warn!(service_id = DEVICE_FOREGROUND_BACKGROUND_HOST_SERVICE_ID, command = operation, trace_id = %trace.trace_id, rejection = ?rejection, "device host lifecycle command rejected before adapter dispatch");
             return Err(preflight_error(rejection));
         }
+        for event_name in [
+            "host_lifecycle.admission_validated",
+            "host_lifecycle.policy_decision",
+            "host_lifecycle.state_changed",
+        ] {
+            self.emit(event_name, &trace.trace_id, "validated");
+        }
         self.ledger.record(operation).await;
         self.emit(
             host_lifecycle_success_event(operation),
             &trace.trace_id,
             "completed",
         );
+        if operation == "host_lifecycle.request_background_lease" {
+            self.emit(
+                "host_lifecycle.background_lease_granted",
+                &trace.trace_id,
+                "granted",
+            );
+        }
+        if operation == "host_lifecycle.inspect_policy" {
+            self.emit(
+                "host_lifecycle.throttle_changed",
+                &trace.trace_id,
+                "unchanged",
+            );
+        }
         info!(service_id = DEVICE_FOREGROUND_BACKGROUND_HOST_SERVICE_ID, command = operation, trace_id = %trace.trace_id, "device host lifecycle command completed with synthetic reference");
         Ok(domain_pack_service_result(
             serde_json::json!({"status":"reference_only","operation":operation,"lifecycle_ref":format!("host-lifecycle-reference:{}", trace.trace_id)}),
