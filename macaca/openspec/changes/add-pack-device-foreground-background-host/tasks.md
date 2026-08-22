@@ -46,7 +46,7 @@
 - [x] 6.3 Add dependency-boundary gates proving microkernel, SDK, shells, and generic application framework do not import concrete lifecycle providers or host lifecycle APIs.
 - [x] 6.4 Add no-direct-provider-call gates proving all host lifecycle commands enter through descriptor-owned service registrations and typed service runtime dispatch.
 - [x] 6.5 Add redaction tests for provider payloads, host identifiers, presentation metadata, lifecycle logs, credentials, session/lease ids, snapshots, and diagnostics.
-- [ ] 6.6 Run `openspec validate add-pack-device-foreground-background-host --strict`, DTO compatibility tests, lifecycle transition tests, lease/session tests, revocation tests, boundary gates, file-size gates, and audit replay checks before marking implementation tasks complete.
+- [x] 6.6 Run `openspec validate add-pack-device-foreground-background-host --strict`, DTO compatibility tests, lifecycle transition tests, lease/session tests, revocation tests, boundary gates, file-size gates, and audit replay checks before marking implementation tasks complete.
 
 ## 7. Developer Documentation
 
