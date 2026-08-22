@@ -46,7 +46,7 @@
 - [x] 6.3 Add dependency-boundary gates proving microkernel, SDK, shells, and generic application framework do not import concrete camera providers or host camera APIs.
 - [x] 6.4 Add no-direct-provider-call gates proving all camera commands enter through descriptor-owned service registrations and typed service runtime dispatch.
 - [x] 6.5 Add redaction tests for raw frames, media bytes, stable hardware identifiers, faces/documents, provider payloads, credentials, session ids, media references, snapshots, and diagnostics.
-- [ ] 6.6 Run `openspec validate add-pack-device-camera --strict`, DTO compatibility tests, authorization tests, session lifecycle tests, media redaction tests, revocation tests, boundary gates, file-size gates, and audit replay checks before marking implementation tasks complete.
+- [x] 6.6 Run `openspec validate add-pack-device-camera --strict`, DTO compatibility tests, authorization tests, session lifecycle tests, media redaction tests, revocation tests, boundary gates, file-size gates, and audit replay checks before marking implementation tasks complete.
 
 ## 7. Developer Documentation
 
