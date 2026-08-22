@@ -151,7 +151,11 @@ impl CommerceCartSystemServiceProvider {
 #[async_trait]
 impl SystemService for CommerceCartSystemServiceProvider {
     fn descriptor(&self) -> ServiceDescriptor {
-        self.descriptor.clone()
+        let mut descriptor = self.descriptor.clone();
+        descriptor
+            .metadata
+            .insert("provider_class".into(), self.capability().provider_class);
+        descriptor
     }
 
     async fn start(&self) -> ServiceResult<()> {
@@ -182,6 +186,17 @@ impl SystemService for CommerceCartSystemServiceProvider {
                 CommerceCartRuntimeEventKind::ProviderCallFailed,
             ));
             return Err(ServiceError::UnsupportedCommand(command.name.to_string()));
+        }
+        if let Some(reason) = cart_admission_denial(&command.payload) {
+            let _ = self.events.send(event(
+                "cart.policy_decision",
+                &trace.trace_id,
+                CommerceCartRuntimeEventKind::PolicyDecision,
+            ));
+            return Err(ServiceError::DisabledByPolicy(reason.into()));
+        }
+        if self.references.read().await.len() >= 100 {
+            return Err(ServiceError::DisabledByPolicy("quota_exceeded".into()));
         }
 
         let cart_ref = format!("cart:reference:{}", trace.trace_id);
@@ -236,6 +251,32 @@ impl SystemService for CommerceCartSystemServiceProvider {
         ));
         Ok(health)
     }
+}
+
+/// Evaluate provider-neutral cart policy facts before retaining cart references.
+fn cart_admission_denial(payload: &serde_json::Value) -> Option<&'static str> {
+    let blocked = |key: &str, reason: &'static str| {
+        (payload.get(key).and_then(serde_json::Value::as_bool) == Some(true)).then_some(reason)
+    };
+    blocked("policy_denied", "policy_denied")
+        .or_else(|| blocked("entitlement_missing", "entitlement_missing"))
+        .or_else(|| blocked("approval_required", "approval_required"))
+        .or_else(|| blocked("line_mutation_denied", "line_mutation_denied"))
+        .or_else(|| blocked("discount_unsupported", "discount_unsupported"))
+        .or_else(|| blocked("estimate_unsupported", "estimate_unsupported"))
+        .or_else(|| blocked("handoff_denied", "handoff_denied"))
+        .or_else(|| blocked("export_denied", "export_denied"))
+        .or_else(|| blocked("stale_data", "stale_data"))
+        .or_else(|| blocked("quota_exceeded", "quota_exceeded"))
+        .or_else(|| blocked("timeout", "timeout"))
+        .or_else(|| blocked("cancelled", "cancelled"))
+        .or_else(|| {
+            (payload
+                .get("line_count")
+                .and_then(serde_json::Value::as_u64)
+                .is_some_and(|count| count > 100))
+            .then_some("line_quota_exceeded")
+        })
 }
 
 /// Build a descriptor from protocol-owned cart constants only.

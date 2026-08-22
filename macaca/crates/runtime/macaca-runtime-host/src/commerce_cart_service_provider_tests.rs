@@ -116,6 +116,46 @@ async fn cart_snapshot_is_bounded_and_shutdown_releases_references() {
 }
 
 #[tokio::test]
+async fn cart_admission_denies_policy_facts_before_reference_state() {
+    let provider = CommerceCartSystemServiceProvider::mock();
+    for (trace, payload) in [
+        ("policy", serde_json::json!({"policy_denied": true})),
+        (
+            "entitlement",
+            serde_json::json!({"entitlement_missing": true}),
+        ),
+        ("approval", serde_json::json!({"approval_required": true})),
+        ("line", serde_json::json!({"line_mutation_denied": true})),
+        ("stale", serde_json::json!({"stale_data": true})),
+        ("quota", serde_json::json!({"line_count": 101})),
+    ] {
+        let result = provider
+            .call(ServiceCommand::with_trace(
+                ServiceCommandName::new("cart.plan_line_mutation"),
+                payload,
+                TraceContext::new(trace),
+            ))
+            .await;
+        assert!(matches!(result, Err(ServiceError::DisabledByPolicy(_))));
+    }
+    assert_eq!(provider.snapshot().await["active_reference_count"], "0");
+}
+
+#[test]
+fn cart_descriptor_reflects_unavailable_provider_capability() {
+    let provider = CommerceCartSystemServiceProvider::unavailable("module_absent");
+    assert_eq!(provider.capability().provider_class, "unavailable");
+    assert!(matches!(
+        provider.capability().state,
+        macaca_proto::DomainPackProviderCapabilityState::Unavailable
+    ));
+    assert_eq!(
+        provider.descriptor().metadata.get("provider_class"),
+        Some(&"unavailable".to_string())
+    );
+}
+
+#[tokio::test]
 async fn cart_events_cover_policy_mutation_handoff_and_snapshot_nodes() {
     let provider = CommerceCartSystemServiceProvider::mock();
     let mut events = provider.subscribe();
