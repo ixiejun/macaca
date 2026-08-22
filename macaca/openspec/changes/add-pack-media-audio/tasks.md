@@ -52,7 +52,7 @@
 ## 6. Trace, Audit, Replay, Security, And Gates
 
 - [ ] 6.1 Emit sanitized declaration, admission, provider-inspection, import/open, metadata-inspection, waveform-inspection, transcode-plan/request, segment-plan/request, filter-plan/request, mix-plan/request, synthesis-plan/request, export-plan/request, artifact-handle, policy, entitlement, resource, approval, health, snapshot, unavailable, and failure events.
-- [ ] 6.2 Ensure traces, audits, snapshots, SDK diagnostics, and examples exclude raw credentials, raw prompts, private recordings, speaker biometric data, generated audio bytes, raw exports, raw provider payloads, manifests, package bytes, private keys, signatures, and unbounded PCM/sample data.
+- [x] 6.2 Ensure traces, audits, snapshots, SDK diagnostics, and examples exclude raw credentials, raw prompts, private recordings, speaker biometric data, generated audio bytes, raw exports, raw provider payloads, manifests, package bytes, private keys, signatures, and unbounded PCM/sample data.
 - [x] 6.3 Add replay tests proving every `audio.*` command is trace-addressable through the canonical service path and that snapshots contain enough bounded metadata for recovery diagnostics.
 - [x] 6.4 Add dependency gates proving kernel, SDK, shells, and generic application framework do not import concrete FFmpeg, GStreamer, Web Audio, libsndfile, OpenAI, ElevenLabs, Google TTS, Polly, storage, moderation, credential-manager, artifact-provider, or provider adapters.
 - [x] 6.5 Add no-direct-provider-call gates proving SDK helpers, WASM ABI handlers, app admission, web, CLI, and frontend paths route through descriptor-owned service commands.

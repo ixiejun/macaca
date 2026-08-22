@@ -216,3 +216,54 @@ async fn side_effecting_requests_are_idempotent_and_stale_versions_do_not_comple
         "precondition_rejected"
     );
 }
+
+#[tokio::test]
+async fn audio_results_events_and_snapshots_redact_all_sensitive_media_data() {
+    let provider = MediaAudioSystemServiceProvider::mock();
+    let mut events = provider.subscribe();
+    let sensitive = serde_json::json!({
+        "credential": "credential-marker",
+        "raw_prompt": "prompt-marker",
+        "private_recording": "recording-marker",
+        "speaker_biometric": "biometric-marker",
+        "generated_audio": "generated-audio-marker",
+        "raw_export": "export-marker",
+        "provider_payload": "provider-marker",
+        "manifest": "manifest-marker",
+        "package_bytes": "package-marker",
+        "private_key": "private-key-marker",
+        "signature": "signature-marker",
+        "pcm_samples": "pcm-marker"
+    });
+    let result = provider
+        .call(ServiceCommand::with_trace(
+            ServiceCommandName::new("audio.synthesis_request"),
+            sensitive,
+            TraceContext::new("audio-redaction"),
+        ))
+        .await
+        .unwrap();
+    let event = events.recv().await.unwrap();
+    let snapshot = provider.snapshot().await;
+    let snapshot_event = events.recv().await.unwrap();
+    let observable = format!("{result:?}{event:?}{snapshot:?}{snapshot_event:?}");
+    for marker in [
+        "credential-marker",
+        "prompt-marker",
+        "recording-marker",
+        "biometric-marker",
+        "generated-audio-marker",
+        "export-marker",
+        "provider-marker",
+        "manifest-marker",
+        "package-marker",
+        "private-key-marker",
+        "signature-marker",
+        "pcm-marker",
+    ] {
+        assert!(
+            !observable.contains(marker),
+            "sensitive marker leaked: {marker}"
+        );
+    }
+}
