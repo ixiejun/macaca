@@ -238,6 +238,33 @@ async fn side_effecting_requests_are_idempotent_and_stale_versions_do_not_comple
 }
 
 #[tokio::test]
+async fn payload_policy_rejections_fail_closed_before_audio_side_effects() {
+    let provider = MediaAudioSystemServiceProvider::mock();
+    for (trace, payload) in [
+        ("scope", serde_json::json!({"scope_denied": true})),
+        ("format", serde_json::json!({"format_unsupported": true})),
+        ("voice", serde_json::json!({"voice_denied": true})),
+        ("prompt", serde_json::json!({"prompt_denied": true})),
+        ("export", serde_json::json!({"export_denied": true})),
+        ("approval", serde_json::json!({"approval_required": true})),
+        ("timeout", serde_json::json!({"timeout": true})),
+    ] {
+        let result = provider
+            .call(ServiceCommand::with_trace(
+                ServiceCommandName::new("audio.export_request"),
+                payload,
+                TraceContext::new(trace),
+            ))
+            .await;
+        assert!(matches!(result, Err(ServiceError::DisabledByPolicy(_))));
+    }
+    assert_eq!(
+        provider.snapshot().await["idempotency_completion_count"],
+        "0"
+    );
+}
+
+#[tokio::test]
 async fn audio_results_events_and_snapshots_redact_all_sensitive_media_data() {
     let provider = MediaAudioSystemServiceProvider::mock();
     let mut events = provider.subscribe();

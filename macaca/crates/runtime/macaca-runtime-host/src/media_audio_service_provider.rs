@@ -193,6 +193,10 @@ impl SystemService for MediaAudioSystemServiceProvider {
             warn!(service_id = MEDIA_AUDIO_SERVICE_ID, command = operation, trace_id = %trace.trace_id, rejection = ?rejection, "media audio command rejected before provider dispatch");
             return Err(preflight_error(rejection));
         }
+        if let Some(reason) = audio_payload_denial(operation, &command.payload) {
+            self.emit(operation, &trace.trace_id, "payload_rejected");
+            return Err(ServiceError::DisabledByPolicy(reason.into()));
+        }
         if let Err(error) = AudioSideEffectLedger::validate_audio_version(&command) {
             self.emit(operation, &trace.trace_id, "precondition_rejected");
             return Err(error);
@@ -237,6 +241,33 @@ impl SystemService for MediaAudioSystemServiceProvider {
                 }
             }))
     }
+}
+
+/// Evaluate bounded policy facts before audio side-effect allocation.
+fn audio_payload_denial(operation: &str, payload: &serde_json::Value) -> Option<&'static str> {
+    let blocked = |key: &str, reason: &'static str| {
+        (payload.get(key).and_then(serde_json::Value::as_bool) == Some(true)).then_some(reason)
+    };
+    blocked("scope_denied", "scope_denied")
+        .or_else(|| blocked("format_unsupported", "format_unsupported"))
+        .or_else(|| blocked("codec_unsupported", "codec_unsupported"))
+        .or_else(|| blocked("metadata_denied", "metadata_denied"))
+        .or_else(|| blocked("voice_denied", "voice_consent_denied"))
+        .or_else(|| blocked("prompt_denied", "prompt_redaction_denied"))
+        .or_else(|| blocked("synthesis_denied", "synthesis_denied"))
+        .or_else(|| blocked("export_denied", "export_denied"))
+        .or_else(|| blocked("approval_required", "approval_required"))
+        .or_else(|| blocked("quota_exceeded", "quota_exceeded"))
+        .or_else(|| blocked("timeout", "timeout"))
+        .or_else(|| blocked("cancelled", "cancelled"))
+        .or_else(|| {
+            (operation.contains("render")
+                && payload
+                    .get("duration_ms")
+                    .and_then(serde_json::Value::as_u64)
+                    .is_some_and(|duration| duration > 300_000))
+            .then_some("duration_limit_exceeded")
+        })
 }
 
 /// Map command and lifecycle markers to stable sanitized audit vocabulary.
