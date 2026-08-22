@@ -29,7 +29,7 @@
 - [x] 4.3 Add grant and transfer state machines covering requested, granted, active, completed, cancelled, expired, revoked, failed, and unavailable states.
 - [x] 4.4 Add mock and unavailable providers for deterministic tests; external or host-specific adapters must remain optional providers or plugin/remote modules.
 - [x] 4.5 Add provider conformance tests for picker commands, handle inspection/list/revoke, read/write/append/truncate, import/export, directory listing, cancellation, redaction, and unsupported-command reporting.
-- [ ] 4.6 Add lifecycle, health, snapshot, shutdown, timeout, cancellation, backpressure, partial transfer, content scanning, resource cleanup, and bounded output behavior.
+- [x] 4.6 Add lifecycle, health, snapshot, shutdown, timeout, cancellation, backpressure, partial transfer, content scanning, resource cleanup, and bounded output behavior.
 
 ## 5. SDK, Admission, Examples, And ABI
 

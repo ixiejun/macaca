@@ -230,6 +230,26 @@ impl SystemService for DeviceLocalFilesSystemServiceProvider {
             self.emit("local_files.policy_decision", &trace.trace_id, "denied");
             return Err(ServiceError::DisabledByPolicy(reason.into()));
         }
+        let (handles, transfers) = self.ledger.counts().await;
+        let allocates_handle = matches!(
+            operation,
+            "local_files.request_open_handle"
+                | "local_files.request_save_handle"
+                | "local_files.request_directory_handle"
+        );
+        let allocates_transfer = matches!(
+            operation,
+            "local_files.import_file" | "local_files.export_file"
+        );
+        // Bound host-side state so flooding cannot grow retained grant/transfer metadata.
+        if (allocates_handle && handles >= 32) || (allocates_transfer && transfers >= 32) {
+            self.emit(
+                "local_files.policy_decision",
+                &trace.trace_id,
+                "quota_exceeded",
+            );
+            return Err(ServiceError::DisabledByPolicy("quota_exceeded".into()));
+        }
         for event_name in [
             "local_files.admission_validated",
             "local_files.policy_decision",
@@ -258,10 +278,20 @@ impl SystemService for DeviceLocalFilesSystemServiceProvider {
                 | "local_files.import_file"
                 | "local_files.export_file"
         ) {
+            let progress_outcome = if command
+                .payload
+                .get("partial_transfer")
+                .and_then(serde_json::Value::as_bool)
+                == Some(true)
+            {
+                "partial"
+            } else {
+                "progressed"
+            };
             self.emit(
                 "local_files.transfer_progressed",
                 &trace.trace_id,
-                "progressed",
+                progress_outcome,
             );
             self.emit(
                 "local_files.transfer_completed",
@@ -270,8 +300,18 @@ impl SystemService for DeviceLocalFilesSystemServiceProvider {
             );
         }
         info!(service_id = DEVICE_LOCAL_FILES_SERVICE_ID, command = operation, trace_id = %trace.trace_id, "local files command completed with opaque reference");
+        let status = if command
+            .payload
+            .get("partial_transfer")
+            .and_then(serde_json::Value::as_bool)
+            == Some(true)
+        {
+            "partial_reference"
+        } else {
+            "reference_only"
+        };
         Ok(domain_pack_service_result(
-            serde_json::json!({"status":"reference_only","operation":operation,"handle_ref":format!("local-file-reference:{}", trace.trace_id)}),
+            serde_json::json!({"status":status,"operation":operation,"handle_ref":format!("local-file-reference:{}", trace.trace_id)}),
             trace,
             "mock",
         ))
@@ -312,6 +352,14 @@ fn local_files_admission_denial(
     .or_else(|| denied("directory_traversal", "directory_traversal_denied"))
     .or_else(|| denied("content_scan_blocked", "content_scan_blocked"))
     .or_else(|| denied("quota_exceeded", "quota_exceeded"))
+    .or_else(|| denied("cancelled", "transfer_cancelled"))
+    .or_else(|| {
+        (payload
+            .get("timeout_ms")
+            .and_then(serde_json::Value::as_u64)
+            == Some(0))
+        .then_some("timeout")
+    })
     .or_else(|| {
         (operation == "local_files.request_directory_handle"
             && payload

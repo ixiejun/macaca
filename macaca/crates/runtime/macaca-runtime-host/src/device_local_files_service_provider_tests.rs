@@ -229,3 +229,48 @@ async fn local_files_reports_unsupported_commands_without_provider_calls() {
     assert!(matches!(result, Err(ServiceError::UnsupportedCommand(_))));
     assert_eq!(provider.snapshot().await["active_handle_count"], "0");
 }
+
+#[tokio::test]
+async fn local_files_bounds_allocations_and_reports_partial_or_cancelled_transfers() {
+    let provider = DeviceLocalFilesSystemServiceProvider::mock();
+    for index in 0..32 {
+        provider
+            .call(ServiceCommand::with_trace(
+                ServiceCommandName::new("local_files.request_open_handle"),
+                serde_json::json!({}),
+                TraceContext::new(format!("handle-{index}")),
+            ))
+            .await
+            .unwrap();
+    }
+    let bounded = provider
+        .call(ServiceCommand::with_trace(
+            ServiceCommandName::new("local_files.request_open_handle"),
+            serde_json::json!({}),
+            TraceContext::new("handle-overflow"),
+        ))
+        .await;
+    assert!(matches!(bounded, Err(ServiceError::DisabledByPolicy(_))));
+    let partial = provider
+        .call(ServiceCommand::with_trace(
+            ServiceCommandName::new("local_files.read"),
+            serde_json::json!({"partial_transfer": true}),
+            TraceContext::new("partial"),
+        ))
+        .await
+        .unwrap();
+    assert_eq!(partial.output["status"], "partial_reference");
+    for (trace, payload) in [
+        ("cancel", serde_json::json!({"cancelled": true})),
+        ("timeout", serde_json::json!({"timeout_ms": 0})),
+    ] {
+        let result = provider
+            .call(ServiceCommand::with_trace(
+                ServiceCommandName::new("local_files.read"),
+                payload,
+                TraceContext::new(trace),
+            ))
+            .await;
+        assert!(matches!(result, Err(ServiceError::DisabledByPolicy(_))));
+    }
+}
