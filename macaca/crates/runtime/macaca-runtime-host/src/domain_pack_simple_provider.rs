@@ -14,6 +14,7 @@ use std::{
     sync::Arc,
 };
 use tokio::sync::RwLock;
+use tracing::{debug, warn};
 
 macro_rules! define_simple_pack {
     ($module:ident, $strategy:ident, $provider:ident, $pack:ident, $service:ident, $commands:ident, $kind:literal) => {
@@ -41,22 +42,23 @@ macro_rules! define_simple_pack {
                 pub fn mock_with_commands<I,S>(commands: I) -> Self where I: IntoIterator<Item=S>, S: Into<String> { Self::new(None, Arc::new(ConfiguredStrategy::with_commands(commands))) }
                 pub fn unavailable(reason: impl Into<String>) -> Self { Self::new(Some(reason.into()), Arc::new(ConfiguredStrategy::unavailable())) }
                 fn new(reason: Option<String>, strategy: Arc<dyn $strategy>) -> Self { Self { descriptor: descriptor(), references: RwLock::new(BTreeMap::new()), unavailable_reason: reason, strategy } }
-                pub async fn snapshot(&self) -> BTreeMap<String,String> { BTreeMap::from([("pack_id".into(), $pack.into()), ("provider_class".into(), self.strategy.provider_class().into()), ("reference_count".into(), self.references.read().await.len().min(256).to_string()), ("redaction_profile".into(), "opaque_references_metadata_only".into())]) }
-                async fn clear(&self) { self.references.write().await.clear(); }
+                pub async fn snapshot(&self) -> BTreeMap<String,String> { let count = self.references.read().await.len().min(256); debug!(pack_id = $pack, reference_count = count, "domain pack snapshot recorded"); BTreeMap::from([("pack_id".into(), $pack.into()), ("provider_class".into(), self.strategy.provider_class().into()), ("reference_count".into(), count.to_string()), ("redaction_profile".into(), "opaque_references_metadata_only".into())]) }
+                async fn clear(&self) { self.references.write().await.clear(); debug!(pack_id = $pack, "domain pack provider references cleared"); }
             }
             #[async_trait]
             impl SystemService for $provider {
                 fn descriptor(&self) -> ServiceDescriptor { self.descriptor.clone() }
-                async fn start(&self) -> ServiceResult<()> { Ok(()) }
+                async fn start(&self) -> ServiceResult<()> { debug!(pack_id = $pack, "domain pack provider started"); Ok(()) }
                 async fn call(&self, command: ServiceCommand) -> ServiceResult<ServiceCallResult> {
                     let trace = domain_pack_command_trace(&command)?;
-                    if let Some(reason) = &self.unavailable_reason { return Err(ServiceError::ServiceUnavailable(sanitize(reason))); }
+                    if let Some(reason) = &self.unavailable_reason { warn!(pack_id = $pack, "domain pack provider unavailable"); return Err(ServiceError::ServiceUnavailable(sanitize(reason))); }
                     if !$commands.contains(&command.name.as_str()) { return Err(ServiceError::UnsupportedCommand("command_not_declared".into())); }
                     self.strategy.validate_command(command.name.as_str())?;
-                    if let Some(reason) = denied(&command.payload) { return Err(ServiceError::DisabledByPolicy(reason.into())); }
-                    if self.references.read().await.len() >= 256 { return Err(ServiceError::DisabledByPolicy("quota_exceeded".into())); }
+                    if let Some(reason) = denied(&command.payload) { warn!(pack_id = $pack, command = %command.name, reason, "domain pack call denied before side effect"); return Err(ServiceError::DisabledByPolicy(reason.into())); }
+                    if self.references.read().await.len() >= 256 { warn!(pack_id = $pack, "domain pack reference quota exceeded"); return Err(ServiceError::DisabledByPolicy("quota_exceeded".into())); }
                     let reference = format!(concat!($kind, ":reference:{}"), trace.trace_id);
                     self.references.write().await.insert(trace.trace_id.clone(), reference.clone());
+                    debug!(pack_id = $pack, command = %command.name, trace_id = %trace.trace_id, "domain pack call completed with redacted reference");
                     Ok(domain_pack_service_result(serde_json::json!({"status":"ok","reference":reference,"provider_class":self.strategy.provider_class(),"content":"redacted","replay_ref":format!("replay:{}", trace.trace_id)}), trace, self.strategy.provider_class()))
                 }
                 async fn stop(&self) -> ServiceResult<()> { self.clear().await; Ok(()) }
