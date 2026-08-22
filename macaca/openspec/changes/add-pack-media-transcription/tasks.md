@@ -52,7 +52,7 @@
 
 ## 6. Trace, Audit, Replay, Security, And Gates
 
-- [ ] 6.1 Emit sanitized declaration, admission, provider-inspection, source import/open, media inspection, batch plan/request, stream plan/start/append/finish/cancel, diarization plan/request, timestamp alignment, normalization, redaction plan/request, subtitle export plan/request, translation handoff plan/request, job inspection, artifact-handle, policy, entitlement, resource, approval, health, snapshot, unavailable, and failure events.
+- [x] 6.1 Emit sanitized declaration, admission, provider-inspection, source import/open, media inspection, batch plan/request, stream plan/start/append/finish/cancel, diarization plan/request, timestamp alignment, normalization, redaction plan/request, subtitle export plan/request, translation handoff plan/request, job inspection, artifact-handle, policy, entitlement, resource, approval, health, snapshot, unavailable, and failure events.
 - [x] 6.2 Ensure traces, audits, snapshots, SDK diagnostics, and examples exclude raw credentials, private audio/video, raw audio chunks, voice biometric features, raw transcripts containing PII, subtitle text containing PII, raw provider payloads, manifests, package bytes, private keys, signatures, and unbounded transcript/audio data.
 - [x] 6.3 Add replay tests proving every `transcription.*` command is trace-addressable through the canonical service path and that snapshots contain enough bounded metadata for recovery diagnostics.
 - [x] 6.4 Add dependency gates proving kernel, SDK, shells, and generic application framework do not import concrete Amazon, Google, Azure, OpenAI, Deepgram, AssemblyAI, Rev, Speechmatics, local model, storage, moderation, credential-manager, artifact-provider, translation, or export adapters.

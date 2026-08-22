@@ -116,7 +116,7 @@ async fn declared_transcription_commands_are_traceable_and_redacted() {
             .unwrap();
         assert_eq!(result.output["status"], "metadata_only");
         assert!(!result.output.to_string().contains("marker"));
-        let event = events.recv().await.unwrap();
+        let event = receive_outcome(&mut events, "completed").await;
         assert_eq!(event.trace_id, trace_id);
         assert_eq!(event.outcome, "completed");
     }
@@ -141,7 +141,7 @@ async fn unavailable_provider_fails_closed_for_every_declared_command() {
             .await
             .unwrap_err();
         assert!(matches!(error, ServiceError::ServiceUnavailable(_)));
-        let event = events.recv().await.unwrap();
+        let event = receive_outcome(&mut events, "unavailable").await;
         assert_eq!(event.outcome, "unavailable");
         assert!(!event.command.contains(raw_marker));
         assert!(!event.replay_ref.contains(raw_marker));
@@ -184,7 +184,7 @@ async fn preflight_rejections_do_not_complete_provider_work() {
     );
     let error = provider.call(command).await.unwrap_err();
     assert!(matches!(error, ServiceError::DisabledByPolicy(_)));
-    let event = events.recv().await.unwrap();
+    let event = receive_outcome(&mut events, "preflight_rejected").await;
     assert_eq!(event.outcome, "preflight_rejected");
 }
 
@@ -254,7 +254,7 @@ async fn host_issued_rejections_never_complete_or_observe_transcription_payloads
             ))
             .await
             .is_err());
-        let event = events.recv().await.unwrap();
+        let event = receive_outcome(&mut events, "preflight_rejected").await;
         assert_eq!(event.outcome, "preflight_rejected");
         assert!(!event.command.contains(marker));
         assert!(!event.replay_ref.contains(marker));
@@ -301,7 +301,9 @@ async fn side_effecting_requests_are_idempotent_and_stale_sources_do_not_complet
         Err(ServiceError::AdapterFailure(_))
     ));
     assert_eq!(
-        events.recv().await.unwrap().outcome,
+        receive_outcome(&mut events, "precondition_rejected")
+            .await
+            .outcome,
         "precondition_rejected"
     );
 }
@@ -320,7 +322,7 @@ async fn replay_snapshot_is_bounded_and_every_declared_command_has_trace_evidenc
             .await
             .unwrap();
         assert_eq!(
-            events.recv().await.unwrap().replay_ref,
+            receive_outcome(&mut events, "completed").await.replay_ref,
             format!("replay:transcription:replay-{command}")
         );
     }
@@ -333,7 +335,12 @@ async fn replay_snapshot_is_bounded_and_every_declared_command_has_trace_evidenc
     assert!(snapshot
         .values()
         .all(|value| !value.contains("must-not-enter-replay")));
-    assert_eq!(events.recv().await.unwrap().outcome, "snapshot_recorded");
+    assert_eq!(
+        receive_outcome(&mut events, "snapshot_recorded")
+            .await
+            .outcome,
+        "snapshot_recorded"
+    );
 }
 
 #[tokio::test]
@@ -368,4 +375,83 @@ async fn replay_references_remain_trace_addressable_after_provider_restart() {
     assert_eq!(event.replay_ref, first_ref);
     assert_eq!(event.trace_id, trace_id);
     assert!(!event.replay_ref.contains("must-not-enter-replay"));
+}
+
+#[tokio::test]
+async fn transcription_emits_stable_audit_taxonomy() {
+    let provider = MediaTranscriptionSystemServiceProvider::mock();
+    let mut events = provider.subscribe();
+    provider.start().await.unwrap();
+    provider.health().await.unwrap();
+    for command in [
+        "transcription.inspect_provider",
+        "transcription.import_source_request",
+        "transcription.inspect_media",
+        "transcription.plan_batch",
+        "transcription.plan_stream",
+        "transcription.start_stream",
+        "transcription.plan_diarization",
+        "transcription.align_timestamps",
+        "transcription.normalize_transcript",
+        "transcription.plan_redaction",
+        "transcription.plan_subtitle_export",
+        "transcription.plan_translation_handoff",
+        "transcription.inspect_job",
+        "transcription.get_artifact_handle",
+    ] {
+        provider
+            .call(ServiceCommand::with_trace(
+                ServiceCommandName::new(command),
+                serde_json::json!({"audio":"redacted","transcript":"redacted"}),
+                TraceContext::new(command),
+            ))
+            .await
+            .unwrap();
+    }
+    let mut names = Vec::new();
+    while let Ok(event) = events.try_recv() {
+        names.push(event.event_name);
+    }
+    for expected in [
+        "transcription.pack_declared",
+        "transcription.health",
+        "transcription.admission",
+        "transcription.provider_inspection",
+        "transcription.policy",
+        "transcription.entitlement",
+        "transcription.resource",
+        "transcription.approval",
+        "transcription.source_import_requested",
+        "transcription.media_inspected",
+        "transcription.batch_planned",
+        "transcription.stream_planned",
+        "transcription.stream_started",
+        "transcription.diarization_planned",
+        "transcription.timestamps_aligned",
+        "transcription.transcript_normalized",
+        "transcription.redaction_planned",
+        "transcription.subtitle_export_planned",
+        "transcription.translation_handoff_planned",
+        "transcription.job_inspected",
+        "transcription.artifact_handle_created",
+    ] {
+        assert!(
+            names.iter().any(|name| name == expected),
+            "missing {expected}"
+        );
+    }
+}
+
+async fn receive_outcome(
+    events: &mut tokio::sync::broadcast::Receiver<
+        super::media_transcription_service_provider::TranscriptionRuntimeEvent,
+    >,
+    expected: &str,
+) -> super::media_transcription_service_provider::TranscriptionRuntimeEvent {
+    loop {
+        let event = events.recv().await.unwrap();
+        if event.outcome == expected {
+            return event;
+        }
+    }
 }

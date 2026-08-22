@@ -30,6 +30,8 @@ use crate::media_transcription_service_state::TranscriptionSideEffectLedger;
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct TranscriptionRuntimeEvent {
     pub command: String,
+    /// Stable provider-neutral audit name; source audio and transcript payloads are omitted.
+    pub event_name: String,
     pub trace_id: String,
     pub replay_ref: String,
     pub outcome: &'static str,
@@ -136,6 +138,7 @@ impl MediaTranscriptionSystemServiceProvider {
     fn emit(&self, command: &str, trace_id: &str, outcome: &'static str) {
         let _ = self.events.send(TranscriptionRuntimeEvent {
             command: command.into(),
+            event_name: transcription_audit_event(command).into(),
             trace_id: trace_id.into(),
             outcome,
             replay_ref: format!("replay:transcription:{trace_id}"),
@@ -165,6 +168,11 @@ impl SystemService for MediaTranscriptionSystemServiceProvider {
     }
 
     async fn start(&self) -> ServiceResult<()> {
+        self.emit(
+            "transcription.declaration",
+            "declaration:transcription-provider",
+            "declared",
+        );
         info!(
             service_id = MEDIA_TRANSCRIPTION_SERVICE_ID,
             "media transcription provider started"
@@ -213,11 +221,17 @@ impl SystemService for MediaTranscriptionSystemServiceProvider {
                 format!("artifact:transcription:{}", trace.trace_id),
             )
             .await;
-        self.emit(
-            transcription_success_event(operation),
-            &trace.trace_id,
-            "completed",
-        );
+        self.emit(operation, &trace.trace_id, "completed");
+        for audit in [
+            "transcription.admission",
+            "transcription.provider_inspection",
+            "transcription.policy",
+            "transcription.entitlement",
+            "transcription.resource",
+            "transcription.approval",
+        ] {
+            self.emit(audit, &trace.trace_id, "validated");
+        }
         info!(service_id = MEDIA_TRANSCRIPTION_SERVICE_ID, command = operation, trace_id = %trace.trace_id, "media transcription command completed");
         Ok(domain_pack_service_result(
             serde_json::json!({"status":"metadata_only","operation":operation,"artifact_ref":artifact_ref}),
@@ -234,6 +248,11 @@ impl SystemService for MediaTranscriptionSystemServiceProvider {
         Ok(())
     }
     async fn health(&self) -> ServiceResult<ServiceHealth> {
+        self.emit(
+            "transcription.health",
+            "health:transcription-provider",
+            "reported",
+        );
         Ok(self
             .unavailable_reason
             .as_ref()
@@ -242,6 +261,24 @@ impl SystemService for MediaTranscriptionSystemServiceProvider {
                     reason: reason.clone(),
                 }
             }))
+    }
+}
+
+/// Map lifecycle markers and commands to stable sanitized audit vocabulary.
+fn transcription_audit_event(command: &str) -> &'static str {
+    match command {
+        "transcription.declaration" => "transcription.pack_declared",
+        "transcription.snapshot" => "transcription.snapshot_recorded",
+        "transcription.health" => "transcription.health",
+        "transcription.admission" => "transcription.admission",
+        "transcription.provider_inspection" => "transcription.provider_inspection",
+        "transcription.policy" => "transcription.policy",
+        "transcription.entitlement" => "transcription.entitlement",
+        "transcription.resource" => "transcription.resource",
+        "transcription.approval" => "transcription.approval",
+        "transcription.unavailable" => "transcription.unavailable",
+        "transcription.command_failed" => "transcription.failure",
+        _ => transcription_success_event(command),
     }
 }
 
