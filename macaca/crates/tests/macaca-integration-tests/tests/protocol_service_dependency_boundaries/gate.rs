@@ -206,6 +206,15 @@ fn classify_crate(crate_name: &str) -> Option<Layer> {
         | "macaca-scheduler"
         | "macaca-heartbeat"
         | "macaca-scheduled-agent-task" => Some(Layer::ServiceProvider),
+        // Foundation packs are replaceable service providers.  Their protocol
+        // contracts remain in `macaca-proto`; these crates own host-side
+        // implementations and therefore must not be treated as kernel code.
+        "macaca-foundation-config"
+        | "macaca-foundation-filesystem"
+        | "macaca-foundation-key-value-state"
+        | "macaca-foundation-secrets-reference"
+        | "macaca-random"
+        | "macaca-time" => Some(Layer::ServiceProvider),
         "macaca-runtime" | "macaca-runtime-host" | "macaca-host-composition" => {
             Some(Layer::RuntimeHost)
         }
