@@ -28,6 +28,8 @@ use crate::media_audio_service_state::AudioSideEffectLedger;
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct AudioRuntimeEvent {
     pub command: String,
+    /// Stable provider-neutral audit name; PCM, prompts, voices, and payloads are omitted.
+    pub event_name: String,
     pub trace_id: String,
     pub replay_ref: String,
     pub outcome: &'static str,
@@ -127,6 +129,12 @@ impl MediaAudioSystemServiceProvider {
     fn emit(&self, command: &str, trace_id: &str, outcome: &'static str) {
         let _ = self.events.send(AudioRuntimeEvent {
             command: command.into(),
+            event_name: match outcome {
+                "unavailable" => "audio.unavailable",
+                "unsupported" => "audio.failure",
+                _ => audio_audit_event(command),
+            }
+            .into(),
             trace_id: trace_id.into(),
             replay_ref: format!("replay:audio:{trace_id}"),
             outcome,
@@ -156,6 +164,11 @@ impl SystemService for MediaAudioSystemServiceProvider {
     }
 
     async fn start(&self) -> ServiceResult<()> {
+        self.emit(
+            "audio.declaration",
+            "declaration:audio-provider",
+            "declared",
+        );
         info!(
             service_id = MEDIA_AUDIO_SERVICE_ID,
             "media audio provider started"
@@ -189,6 +202,15 @@ impl SystemService for MediaAudioSystemServiceProvider {
             .outcome_ref(&command, format!("artifact:audio:{}", trace.trace_id))
             .await;
         self.emit(operation, &trace.trace_id, "completed");
+        for audit in [
+            "audio.admission",
+            "audio.policy",
+            "audio.entitlement",
+            "audio.resource",
+            "audio.approval",
+        ] {
+            self.emit(audit, &trace.trace_id, "validated");
+        }
         info!(service_id = MEDIA_AUDIO_SERVICE_ID, command = operation, trace_id = %trace.trace_id, "media audio command completed");
         Ok(domain_pack_service_result(
             serde_json::json!({"status":"metadata_only","operation":operation,"artifact_ref":artifact_ref}),
@@ -205,6 +227,7 @@ impl SystemService for MediaAudioSystemServiceProvider {
         Ok(())
     }
     async fn health(&self) -> ServiceResult<ServiceHealth> {
+        self.emit("audio.health", "health:audio-provider", "reported");
         Ok(self
             .unavailable_reason
             .as_ref()
@@ -213,6 +236,36 @@ impl SystemService for MediaAudioSystemServiceProvider {
                     reason: reason.clone(),
                 }
             }))
+    }
+}
+
+/// Map command and lifecycle markers to stable sanitized audit vocabulary.
+fn audio_audit_event(command: &str) -> &'static str {
+    match command {
+        "audio.declaration" => "audio.pack_declared",
+        "audio.snapshot" => "audio.snapshot_recorded",
+        "audio.health" => "audio.health",
+        "audio.unavailable" => "audio.unavailable",
+        "audio.failure" => "audio.failure",
+        "audio.admission" => "audio.admission",
+        "audio.policy" => "audio.policy",
+        "audio.entitlement" => "audio.entitlement",
+        "audio.resource" => "audio.resource",
+        "audio.approval" => "audio.approval",
+        command if command.contains("inspect_provider") => "audio.provider_inspection",
+        command if command.contains("import") || command.contains("open_audio") => {
+            "audio.import_open"
+        }
+        command if command.contains("metadata") => "audio.metadata_inspection",
+        command if command.contains("waveform") => "audio.waveform_inspection",
+        command if command.contains("transcode") => "audio.transcode",
+        command if command.contains("segment") => "audio.segment",
+        command if command.contains("filter") => "audio.filter",
+        command if command.contains("mix") => "audio.mix",
+        command if command.contains("synthesis") => "audio.synthesis",
+        command if command.contains("export") => "audio.export",
+        command if command.contains("artifact") => "audio.artifact_handle",
+        _ => "audio.command",
     }
 }
 

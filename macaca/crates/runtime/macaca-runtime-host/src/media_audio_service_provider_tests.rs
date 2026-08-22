@@ -25,7 +25,10 @@ async fn declared_audio_commands_are_traceable_and_redacted() {
             .unwrap();
         assert_eq!(result.output["status"], "metadata_only");
         assert!(!result.output.to_string().contains(marker));
-        assert_eq!(events.recv().await.unwrap().outcome, "completed");
+        assert_eq!(
+            receive_outcome(&mut events, "completed").await.outcome,
+            "completed"
+        );
     }
 }
 
@@ -48,7 +51,24 @@ async fn unavailable_audio_provider_fails_closed_for_every_command() {
                 .await,
             Err(ServiceError::ServiceUnavailable(_))
         ));
-        assert_eq!(events.recv().await.unwrap().outcome, "unavailable");
+        assert_eq!(
+            receive_outcome(&mut events, "unavailable").await.outcome,
+            "unavailable"
+        );
+    }
+}
+
+async fn receive_outcome(
+    events: &mut tokio::sync::broadcast::Receiver<
+        super::media_audio_service_provider::AudioRuntimeEvent,
+    >,
+    expected: &str,
+) -> super::media_audio_service_provider::AudioRuntimeEvent {
+    loop {
+        let event = events.recv().await.unwrap();
+        if event.outcome == expected {
+            return event;
+        }
     }
 }
 
@@ -264,6 +284,65 @@ async fn audio_results_events_and_snapshots_redact_all_sensitive_media_data() {
         assert!(
             !observable.contains(marker),
             "sensitive marker leaked: {marker}"
+        );
+    }
+}
+
+#[tokio::test]
+async fn audio_emits_stable_audit_taxonomy() {
+    let provider = MediaAudioSystemServiceProvider::mock();
+    let mut events = provider.subscribe();
+    provider.start().await.unwrap();
+    provider.health().await.unwrap();
+    for command in [
+        "audio.inspect_provider",
+        "audio.import_audio_request",
+        "audio.inspect_metadata",
+        "audio.inspect_waveform",
+        "audio.plan_transcode",
+        "audio.plan_segment",
+        "audio.plan_filter",
+        "audio.plan_mix",
+        "audio.plan_synthesis",
+        "audio.plan_export",
+        "audio.get_artifact_handle",
+    ] {
+        provider
+            .call(ServiceCommand::with_trace(
+                ServiceCommandName::new(command),
+                serde_json::json!({"pcm":"redacted","prompt":"redacted"}),
+                TraceContext::new(command),
+            ))
+            .await
+            .unwrap();
+    }
+    let mut names = Vec::new();
+    while let Ok(event) = events.try_recv() {
+        names.push(event.event_name);
+    }
+    for expected in [
+        "audio.pack_declared",
+        "audio.health",
+        "audio.admission",
+        "audio.policy",
+        "audio.entitlement",
+        "audio.resource",
+        "audio.approval",
+        "audio.provider_inspection",
+        "audio.import_open",
+        "audio.metadata_inspection",
+        "audio.waveform_inspection",
+        "audio.transcode",
+        "audio.segment",
+        "audio.filter",
+        "audio.mix",
+        "audio.synthesis",
+        "audio.export",
+        "audio.artifact_handle",
+    ] {
+        assert!(
+            names.iter().any(|name| name == expected),
+            "missing {expected}"
         );
     }
 }
