@@ -16,36 +16,36 @@
 ## 3. Permission, Policy, Resource, Entitlement, And Approval
 
 - [x] 3.1 Implement declaration validation for `location.place.search.read`, `location.place.autocomplete.read`, `location.place.details.read`, `location.place.categories.read`, `location.place.media.reference.read`, and `location.place.session.manage`.
-- [ ] 3.2 Require field masks for details commands and apply entitlement/cost checks before provider calls for expensive or plan-gated fields such as media references, rating summaries, business profile, external references, and rich opening hours.
-- [ ] 3.3 Enforce spatial-boundary, region, locale, retention, provider-class, and result-count policies before dispatch.
-- [ ] 3.4 Add resource reservation and quota checks for network calls, provider rate class, retained autocomplete sessions, page size, result count, and snapshot size.
-- [ ] 3.5 Add approval behavior for precise-location disclosure, native foreground/background host restrictions, external network disclosure, high-spend searches, and retained user-intent sessions.
-- [ ] 3.6 Add tests proving denied, unavailable, unsupported, and quota paths do not call concrete providers.
+- [x] 3.2 Require field masks for details commands and apply entitlement/cost checks before provider calls for expensive or plan-gated fields such as media references, rating summaries, business profile, external references, and rich opening hours.
+- [x] 3.3 Enforce spatial-boundary, region, locale, retention, provider-class, and result-count policies before dispatch.
+- [x] 3.4 Add resource reservation and quota checks for network calls, provider rate class, retained autocomplete sessions, page size, result count, and snapshot size.
+- [x] 3.5 Add approval behavior for precise-location disclosure, native foreground/background host restrictions, external network disclosure, high-spend searches, and retained user-intent sessions.
+- [x] 3.6 Add tests proving denied, unavailable, unsupported, and quota paths do not call concrete providers.
 
 ## 4. Service Provider And Replacement Strategy
 
-- [ ] 4.1 Implement the location place search service provider contract behind the service runtime; do not construct providers in the kernel, SDK, shells, or generic application framework.
-- [ ] 4.2 Add `PlaceSearchProviderDescriptor` with supported commands, fields, regions, locale behavior, attribution obligations, retention restrictions, rate/cost classes, and health state.
+- [x] 4.1 Implement the location place search service provider contract behind the service runtime; do not construct providers in the kernel, SDK, shells, or generic application framework.
+- [x] 4.2 Add `PlaceSearchProviderDescriptor` with supported commands, fields, regions, locale behavior, attribution obligations, retention restrictions, rate/cost classes, and health state.
 - [x] 4.3 Add Adapter implementations or fixtures for at least one mock provider and one unavailable provider; provider-specific adapters for external suppliers must remain optional modules or plugin/remote providers.
-- [ ] 4.4 Add provider conformance tests for search, nearby, suggest, resolve suggestion, details, categories, field inspection, attribution inspection, purge, redaction, pagination, and unsupported-field reporting.
-- [ ] 4.5 Add lifecycle, health, snapshot, shutdown, timeout, cancellation, pagination cursor, and bounded output behavior.
+- [x] 4.4 Add provider conformance tests for search, nearby, suggest, resolve suggestion, details, categories, field inspection, attribution inspection, purge, redaction, pagination, and unsupported-field reporting.
+- [x] 4.5 Add lifecycle, health, snapshot, shutdown, timeout, cancellation, pagination cursor, and bounded output behavior.
 
 ## 5. SDK, Admission, Examples, And ABI
 
 - [x] 5.1 Extend SDK discovery for `pack.location.place.search.v1` with command schemas, DTO schemas, permission scopes, examples, field capability matrix, availability, diagnostics, provider class, compatibility, cost/rate hints, attribution rules, and documentation URL.
 - [x] 5.2 Extend application admission so required declarations block when unavailable and optional declarations degrade explicitly with effective capability mementos.
 - [x] 5.3 Add SDK command helper builders that only produce canonical traced service calls and never construct providers or branch on provider names.
-- [ ] 5.4 Add WASM/application ABI exposure for the pack using provider-neutral DTO schemas and canonical service-call dispatch.
+- [x] 5.4 Add WASM/application ABI exposure for the pack using provider-neutral DTO schemas and canonical service-call dispatch.
 - [x] 5.5 Add generic examples for text search, nearby category search, autocomplete plus resolve, details with field mask, attribution inspection, and unavailable-provider diagnostics using synthetic data only.
 
 ## 6. Trace, Audit, Replay, And Boundary Gates
 
-- [ ] 6.1 Emit sanitized `place_search.pack_declared`, `place_search.admission_validated`, `place_search.policy_decision`, `place_search.entitlement_checked`, `place_search.resource_reserved`, `place_search.command_requested`, `place_search.provider_selected`, `place_search.command_succeeded`, `place_search.command_failed`, `place_search.unavailable`, `place_search.attribution_recorded`, `place_search.session_purged`, and `place_search.snapshot_recorded` events.
-- [ ] 6.2 Add replay tests proving every command is trace-addressable through the canonical service path after refresh/restart.
-- [ ] 6.3 Add dependency-boundary gates proving the microkernel, SDK, shells, and generic application framework do not import concrete place search providers.
-- [ ] 6.4 Add no-direct-provider-call gates proving all place search commands enter through descriptor-owned service registrations and typed service runtime dispatch.
-- [ ] 6.5 Add redaction tests for query text, exact coordinates, media references, attribution data, provider payloads, credentials, session tokens, and snapshots.
-- [ ] 6.6 Run `openspec validate add-pack-location-place-search --strict`, DTO compatibility tests, targeted cargo tests, service-boundary tests, file-size gates, and audit replay checks before marking implementation tasks complete.
+- [x] 6.1 Emit sanitized `place_search.pack_declared`, `place_search.admission_validated`, `place_search.policy_decision`, `place_search.entitlement_checked`, `place_search.resource_reserved`, `place_search.command_requested`, `place_search.provider_selected`, `place_search.command_succeeded`, `place_search.command_failed`, `place_search.unavailable`, `place_search.attribution_recorded`, `place_search.session_purged`, and `place_search.snapshot_recorded` events.
+- [x] 6.2 Add replay tests proving every command is trace-addressable through the canonical service path after refresh/restart.
+- [x] 6.3 Add dependency-boundary gates proving the microkernel, SDK, shells, and generic application framework do not import concrete place search providers.
+- [x] 6.4 Add no-direct-provider-call gates proving all place search commands enter through descriptor-owned service registrations and typed service runtime dispatch.
+- [x] 6.5 Add redaction tests for query text, exact coordinates, media references, attribution data, provider payloads, credentials, session tokens, and snapshots.
+- [x] 6.6 Run `openspec validate add-pack-location-place-search --strict`, DTO compatibility tests, targeted cargo tests, service-boundary tests, file-size gates, and audit replay checks before marking implementation tasks complete.
 
 ## 7. Developer Documentation
 

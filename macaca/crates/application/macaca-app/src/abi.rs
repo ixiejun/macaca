@@ -17,11 +17,12 @@ use macaca_proto::{
     validate_identity_auth_handoff_permission_declarations,
     validate_identity_profile_permission_declarations, validate_key_value_namespace_declarations,
     validate_knowledge_graph_permission_declarations, validate_local_files_permission_declarations,
-    validate_secret_reference_declarations, validate_session_state_declarations,
-    validate_transcription_permission_declarations, ApplicationAbiDeclaration, ApplicationAbiError,
-    ApplicationCheckpoint, ApplicationExport, ApplicationHostCommandResult,
-    ApplicationHostCommandStatus, ApplicationLifecycleState, DomainPackCatalog,
-    EffectiveServiceCapabilities, InMemoryDomainPackCatalog, PackageDescriptor, PackageRuntimeKind,
+    validate_location_place_search_permission_declarations, validate_secret_reference_declarations,
+    validate_session_state_declarations, validate_transcription_permission_declarations,
+    ApplicationAbiDeclaration, ApplicationAbiError, ApplicationCheckpoint, ApplicationExport,
+    ApplicationHostCommandResult, ApplicationHostCommandStatus, ApplicationLifecycleState,
+    DomainPackCatalog, EffectiveServiceCapabilities, InMemoryDomainPackCatalog, PackageDescriptor,
+    PackageRuntimeKind,
 };
 use tracing::{info, warn};
 
@@ -206,6 +207,10 @@ impl ApplicationAbiAdapter for YamlApplicationAbiAdapter {
             })?;
             validate_finance_accounting_permission_declarations(service_contract).map_err(|reason| {
                 warn!(application_id = %application_id, reason, "finance accounting permission admission rejected");
+                ApplicationAbiError::InvalidDeclaration(reason.into())
+            })?;
+            validate_location_place_search_permission_declarations(service_contract).map_err(|reason| {
+                warn!(application_id = %application_id, reason, "location place-search permission admission rejected");
                 ApplicationAbiError::InvalidDeclaration(reason.into())
             })?;
         }

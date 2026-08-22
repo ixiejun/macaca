@@ -11,6 +11,21 @@ use super::model::{DomainPackDefinition, DomainPackProviderCapabilityState};
 
 pub const LOCATION_PLACE_SEARCH_PACK_ID: &str = "pack.location.place.search.v1";
 pub const LOCATION_PLACE_SEARCH_SERVICE_ID: &str = "service.location.place_search";
+pub const LOCATION_PLACE_SEARCH_TRACE_EVENTS: &[&str] = &[
+    "place_search.pack_declared",
+    "place_search.admission_validated",
+    "place_search.policy_decision",
+    "place_search.entitlement_checked",
+    "place_search.resource_reserved",
+    "place_search.command_requested",
+    "place_search.provider_selected",
+    "place_search.command_succeeded",
+    "place_search.command_failed",
+    "place_search.unavailable",
+    "place_search.attribution_recorded",
+    "place_search.session_purged",
+    "place_search.snapshot_recorded",
+];
 
 pub const LOCATION_PLACE_SEARCH_COMMANDS: &[&str] = &[
     "place_search.search",
@@ -24,7 +39,7 @@ pub const LOCATION_PLACE_SEARCH_COMMANDS: &[&str] = &[
     "place_search.purge_session",
 ];
 
-const PLACE_SEARCH_PERMISSION_SCOPES: &[&str] = &[
+pub const PLACE_SEARCH_PERMISSION_SCOPES: &[&str] = &[
     "location.place.search.read",
     "location.place.autocomplete.read",
     "location.place.details.read",

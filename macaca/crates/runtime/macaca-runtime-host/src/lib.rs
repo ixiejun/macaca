@@ -122,6 +122,8 @@ pub mod lease;
 pub mod llm_service_catalog;
 pub mod llm_service_hardening;
 pub mod llm_service_provider;
+pub mod location_place_search_service_provider;
+mod location_place_search_strategy;
 pub(crate) mod mcp_descriptor_index;
 pub(crate) mod mcp_invocation_registry;
 pub(crate) mod mcp_operator_lifecycle;
@@ -321,6 +323,7 @@ mod interaction_service_provider_tests;
 mod interaction_service_state_tests;
 #[cfg(test)]
 mod llm_service_provider_hardening_tests;
+mod location_place_search_service_provider_tests;
 #[cfg(test)]
 mod messaging_service_provider_tests;
 #[cfg(test)]

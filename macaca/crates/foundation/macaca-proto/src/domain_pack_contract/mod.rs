@@ -147,6 +147,7 @@ pub mod location_common;
 pub mod location_geocode;
 pub mod location_maps;
 pub mod location_place_search;
+mod location_place_search_validation_permissions;
 pub mod location_route;
 pub mod location_timezone;
 pub mod media_audio;
