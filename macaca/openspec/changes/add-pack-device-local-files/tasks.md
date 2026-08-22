@@ -24,7 +24,7 @@
 
 ## 4. Service Provider, Grant, And Transfer Strategy
 
-- [ ] 4.1 Implement the device local file service provider contract behind the service runtime; do not construct providers from kernel, SDK, shells, or generic application-framework code.
+- [x] 4.1 Implement the device local file service provider contract behind the service runtime; do not construct providers from kernel, SDK, shells, or generic application-framework code.
 - [x] 4.2 Add provider descriptor support for host-native, browser, remote-host, plugin, mock, and unavailable provider classes.
 - [ ] 4.3 Add grant and transfer state machines covering requested, granted, active, completed, cancelled, expired, revoked, failed, and unavailable states.
 - [x] 4.4 Add mock and unavailable providers for deterministic tests; external or host-specific adapters must remain optional providers or plugin/remote modules.
@@ -45,7 +45,7 @@
 - [ ] 6.2 Add replay tests proving every command is trace-addressable through the canonical service path after refresh/restart without raw file contents or raw host paths.
 - [ ] 6.3 Add dependency-boundary gates proving microkernel, SDK, shells, and generic application framework do not import concrete local file providers or host file APIs.
 - [ ] 6.4 Add no-direct-provider-call gates proving all local file commands enter through descriptor-owned service registrations and typed service runtime dispatch.
-- [ ] 6.5 Add redaction tests for raw host paths, raw file contents, file names when policy forbids them, provider payloads, credentials, transfer chunks, handles, snapshots, and diagnostics.
+- [x] 6.5 Add redaction tests for raw host paths, raw file contents, file names when policy forbids them, provider payloads, credentials, transfer chunks, handles, snapshots, and diagnostics.
 - [ ] 6.6 Run `openspec validate add-pack-device-local-files --strict`, DTO compatibility tests, grant lifecycle tests, bounded transfer tests, revocation tests, boundary gates, file-size gates, and audit replay checks before marking implementation tasks complete.
 
 ## 7. Developer Documentation
