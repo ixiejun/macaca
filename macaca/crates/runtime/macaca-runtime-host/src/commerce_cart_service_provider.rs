@@ -6,12 +6,15 @@
 //! A concrete cart implementation can replace this Strategy through the normal service registry
 //! without changing SDK, kernel, shell, or application code.
 
-use std::collections::{BTreeMap, BTreeSet};
+use std::collections::BTreeMap;
+use std::sync::Arc;
 
+use crate::commerce_cart_strategy::{CommerceCartProviderStrategy, ConfiguredCommerceCartStrategy};
 use async_trait::async_trait;
 use macaca_kernel::SystemService;
 use macaca_proto::domain_pack_contract::commerce_cart::{
-    CartProviderCapability, COMMERCE_CART_COMMANDS, COMMERCE_CART_PACK_ID, COMMERCE_CART_SERVICE_ID,
+    CartProviderCapability, COMMERCE_CART_COMMANDS, COMMERCE_CART_PACK_ID,
+    COMMERCE_CART_SERVICE_ID, COMMERCE_CART_TRACE_EVENTS,
 };
 use macaca_proto::{
     domain_pack_command_trace, domain_pack_service_result, DomainPackProviderCapabilityState,
@@ -58,12 +61,24 @@ pub struct CommerceCartSystemServiceProvider {
     events: broadcast::Sender<CommerceCartRuntimeEvent>,
     references: RwLock<BTreeMap<String, String>>,
     unavailable_reason: Option<String>,
+    strategy: Arc<dyn CommerceCartProviderStrategy>,
 }
 
 impl CommerceCartSystemServiceProvider {
     /// Create a metadata-only mock Strategy for conformance and replay tests.
     pub fn mock() -> Self {
         Self::new(None)
+    }
+
+    /// Build a synthetic cart provider with explicit command capability gaps.
+    pub fn mock_with_commands<I, S>(commands: I) -> Self
+    where
+        I: IntoIterator<Item = S>,
+        S: Into<String>,
+    {
+        let mut provider = Self::new(None);
+        provider.strategy = Arc::new(ConfiguredCommerceCartStrategy::with_commands(commands));
+        provider
     }
 
     /// Create a fail-closed provider when no cart adapter is installed.
@@ -73,43 +88,24 @@ impl CommerceCartSystemServiceProvider {
 
     fn new(unavailable_reason: Option<String>) -> Self {
         let (events, _) = broadcast::channel(256);
+        let strategy: Arc<dyn CommerceCartProviderStrategy> =
+            Arc::new(if unavailable_reason.is_some() {
+                ConfiguredCommerceCartStrategy::unavailable()
+            } else {
+                ConfiguredCommerceCartStrategy::mock()
+            });
         Self {
             descriptor: commerce_cart_service_descriptor(),
             events,
             references: RwLock::new(BTreeMap::new()),
             unavailable_reason,
+            strategy,
         }
     }
 
     /// Report feature flags and bounded limits without exposing provider implementation details.
     pub fn capability(&self) -> CartProviderCapability {
-        CartProviderCapability {
-            provider_class: if self.unavailable_reason.is_some() {
-                "unavailable".into()
-            } else {
-                "mock".into()
-            },
-            feature_flags: COMMERCE_CART_COMMANDS
-                .iter()
-                .map(|command| (*command).into())
-                .chain([
-                    "version_tokens".into(),
-                    "stale_data".into(),
-                    "async_export".into(),
-                    "cancellation".into(),
-                ])
-                .collect::<BTreeSet<_>>(),
-            limits: BTreeMap::from([
-                ("max_page_size".into(), 100),
-                ("max_lines".into(), 100),
-                ("max_export_bytes".into(), 65_536),
-            ]),
-            state: if self.unavailable_reason.is_some() {
-                DomainPackProviderCapabilityState::Unavailable
-            } else {
-                DomainPackProviderCapabilityState::Preview
-            },
-        }
+        self.strategy.capability()
     }
 
     /// Subscribe to bounded cart lifecycle events for replay and audit tests.
@@ -185,18 +181,25 @@ impl SystemService for CommerceCartSystemServiceProvider {
                 &trace.trace_id,
                 CommerceCartRuntimeEventKind::ProviderCallFailed,
             ));
-            return Err(ServiceError::UnsupportedCommand(command.name.to_string()));
+            return Err(normalize_cart_error(ServiceError::UnsupportedCommand(
+                command.name.to_string(),
+            )));
         }
+        self.strategy.validate_command(command.name.as_str())?;
         if let Some(reason) = cart_admission_denial(&command.payload) {
             let _ = self.events.send(event(
                 "cart.policy_decision",
                 &trace.trace_id,
                 CommerceCartRuntimeEventKind::PolicyDecision,
             ));
-            return Err(ServiceError::DisabledByPolicy(reason.into()));
+            return Err(normalize_cart_error(ServiceError::DisabledByPolicy(
+                reason.into(),
+            )));
         }
         if self.references.read().await.len() >= 100 {
-            return Err(ServiceError::DisabledByPolicy("quota_exceeded".into()));
+            return Err(normalize_cart_error(ServiceError::DisabledByPolicy(
+                "quota_exceeded".into(),
+            )));
         }
 
         let cart_ref = format!("cart:reference:{}", trace.trace_id);
@@ -279,6 +282,23 @@ fn cart_admission_denial(payload: &serde_json::Value) -> Option<&'static str> {
         })
 }
 
+/// Normalize provider errors to bounded cart-owned result classes.
+fn normalize_cart_error(error: ServiceError) -> ServiceError {
+    match error {
+        ServiceError::UnsupportedCommand(_) => {
+            ServiceError::UnsupportedCommand("cart_command_unsupported".into())
+        }
+        ServiceError::DisabledByPolicy(reason) => ServiceError::DisabledByPolicy(
+            reason
+                .chars()
+                .filter(|character| character.is_ascii_alphanumeric() || *character == '_')
+                .take(64)
+                .collect(),
+        ),
+        other => other,
+    }
+}
+
 /// Build a descriptor from protocol-owned cart constants only.
 pub fn commerce_cart_service_descriptor() -> ServiceDescriptor {
     let mut descriptor = ServiceDescriptor::new(
@@ -295,6 +315,10 @@ pub fn commerce_cart_service_descriptor() -> ServiceDescriptor {
     descriptor.metadata.insert(
         "command_count".into(),
         COMMERCE_CART_COMMANDS.len().to_string(),
+    );
+    descriptor.metadata.insert(
+        "trace_event_count".into(),
+        COMMERCE_CART_TRACE_EVENTS.len().to_string(),
     );
     descriptor
 }

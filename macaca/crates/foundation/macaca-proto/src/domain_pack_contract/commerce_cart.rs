@@ -12,6 +12,21 @@ use super::model::{DomainPackDefinition, DomainPackProviderCapabilityState};
 pub const COMMERCE_CART_PACK_ID: &str = "pack.commerce.cart.v1";
 pub const COMMERCE_CART_SERVICE_ID: &str = "service.commerce.cart";
 
+/// Stable sanitized cart trace taxonomy for audit and replay consumers.
+pub const COMMERCE_CART_TRACE_EVENTS: &[&str] = &[
+    "cart_pack_declared",
+    "cart_pack_admission_validated",
+    "cart_pack_policy_decision",
+    "cart_pack_provider_inspected",
+    "cart_pack_service_call_requested",
+    "cart_pack_service_call_succeeded",
+    "cart_pack_service_call_failed",
+    "cart_pack_mutation_planned",
+    "cart_pack_handoff_planned",
+    "cart_pack_unavailable",
+    "cart_pack_snapshot_recorded",
+];
+
 pub const COMMERCE_CART_COMMANDS: &[&str] = &[
     "cart.inspect_provider",
     "cart.describe_schema",

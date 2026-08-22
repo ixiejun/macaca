@@ -45,17 +45,17 @@
 
 ## 5. Service Provider, Provider Strategy, And Unavailable Behavior
 
-- [ ] 5.1 Add the cart service provider interface with descriptor, lifecycle, health, snapshot, shutdown, timeout, cancellation, async export support, and command dispatch.
-- [ ] 5.2 Implement provider Strategy adapters behind the service interface without provider-name routing in OS-layer command logic.
-- [ ] 5.3 Implement a mock provider with synthetic carts, lines, discounts, estimates, validation issues, handoff intents, stale-data states, and configurable capability gaps.
+- [x] 5.1 Add the cart service provider interface with descriptor, lifecycle, health, snapshot, shutdown, timeout, cancellation, async export support, and command dispatch.
+- [x] 5.2 Implement provider Strategy adapters behind the service interface without provider-name routing in OS-layer command logic.
+- [x] 5.3 Implement a mock provider with synthetic carts, lines, discounts, estimates, validation issues, handoff intents, stale-data states, and configurable capability gaps.
 - [x] 5.4 Implement an unavailable provider that returns explicit unavailable diagnostics for every command without fake success.
-- [ ] 5.5 Normalize provider errors into Macaca result envelopes while preserving sanitized provider class, bounded code, retriable flag, freshness, version conflict, and replay pointer.
+- [x] 5.5 Normalize provider errors into Macaca result envelopes while preserving sanitized provider class, bounded code, retriable flag, freshness, version conflict, and replay pointer.
 - [x] 5.6 Add provider capability discovery for line support, custom line support, discount/gift-card support, buyer identity support, tax/shipping estimate support, handoff support, versioning, stale-price behavior, search/export support, limits, freshness, and attribution.
 
 ## 6. SDK, Admission, Examples, And Developer Documentation
 
 - [x] 6.1 Extend pack catalog and SDK discovery for `pack.commerce.cart.v1` with schemas, scopes, examples, availability, health, diagnostics, compatibility, provider class, and docs metadata.
-- [ ] 6.2 Extend application admission so required declarations block on unavailable/denied states and optional declarations degrade explicitly with effective capability mementos.
+- [x] 6.2 Extend application admission so required declarations block on unavailable/denied states and optional declarations degrade explicitly with effective capability mementos.
 - [x] 6.3 Add SDK command helper builders that only construct canonical traced service calls and never construct providers.
 - [x] 6.4 Add generic app-facing examples for creating a cart, adding/removing lines, updating context, applying discounts, estimating prices, validating stale carts, planning handoff, and handling version conflicts.
 - [x] 6.5 Create `docs/developer-packs/commerce/cart.md` with purpose, manifest declaration, scopes, commands, DTOs, examples, unavailable diagnostics, provider replacement, trace/audit behavior, redaction, stale-data semantics, version conflicts, handoff boundaries, and cart/order/payment separation.
@@ -63,9 +63,9 @@
 
 ## 7. Trace, Audit, Replay, And Redaction
 
-- [ ] 7.1 Emit sanitized declaration, admission, provider-inspection, policy, entitlement, approval, resource, service-call, mutation-planning, handoff-planning, unavailable, health, snapshot, and result events.
-- [ ] 7.2 Add trace schemas for `cart_pack_declared`, `cart_pack_admission_validated`, `cart_pack_policy_decision`, `cart_pack_provider_inspected`, `cart_pack_service_call_requested`, `cart_pack_service_call_succeeded`, `cart_pack_service_call_failed`, `cart_pack_mutation_planned`, `cart_pack_handoff_planned`, `cart_pack_unavailable`, and `cart_pack_snapshot_recorded`.
-- [ ] 7.3 Add replay tests proving every command is trace-addressable through the canonical service runtime path.
+- [x] 7.1 Emit sanitized declaration, admission, provider-inspection, policy, entitlement, approval, resource, service-call, mutation-planning, handoff-planning, unavailable, health, snapshot, and result events.
+- [x] 7.2 Add trace schemas for `cart_pack_declared`, `cart_pack_admission_validated`, `cart_pack_policy_decision`, `cart_pack_provider_inspected`, `cart_pack_service_call_requested`, `cart_pack_service_call_succeeded`, `cart_pack_service_call_failed`, `cart_pack_mutation_planned`, `cart_pack_handoff_planned`, `cart_pack_unavailable`, and `cart_pack_snapshot_recorded`.
+- [x] 7.3 Add replay tests proving every command is trace-addressable through the canonical service runtime path.
 - [x] 7.4 Add snapshot tests proving descriptor, provider health, command availability, schema/version support, pricing/discount/handoff support, policy-template hash, redaction profile, resource counters, freshness, and replay pointers are retained without raw payload leakage.
 - [x] 7.5 Add redaction tests proving raw buyer PII, payment data, raw provider payloads, secret checkout URLs, provider-specific mutation DSLs, and unbounded cart exports never enter logs, traces, snapshots, or SDK diagnostics.
 
@@ -74,7 +74,7 @@
 - [x] 8.1 Add dependency gates proving kernel, SDK, shells, and generic application framework do not import concrete cart providers.
 - [x] 8.2 Add no-direct-provider-call tests proving all callable operations traverse descriptor-owned service registration and typed service commands.
 - [x] 8.3 Add canonical execution-path tests covering read-only, context update, line mutation, discount, estimate, validation, handoff, export, denied, unavailable, unsupported, conflict, quota, and stale-data paths.
-- [ ] 8.4 Add provider replacement tests for built-in, plugin, remote, mock, and unavailable providers.
+- [x] 8.4 Add provider replacement tests for built-in, plugin, remote, mock, and unavailable providers.
 - [x] 8.5 Add file-size and module-ownership checks for any new implementation files.
 - [x] 8.6 Run `openspec validate add-pack-commerce-cart --strict`.
-- [ ] 8.7 Run targeted cargo checks/tests, dependency-boundary gates, audit replay checks, redaction checks, and cart/order/payment boundary checks before marking implementation tasks complete.
+- [x] 8.7 Run targeted cargo checks/tests, dependency-boundary gates, audit replay checks, redaction checks, and cart/order/payment boundary checks before marking implementation tasks complete.

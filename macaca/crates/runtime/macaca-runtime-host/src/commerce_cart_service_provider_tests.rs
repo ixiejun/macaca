@@ -181,3 +181,16 @@ async fn cart_events_cover_policy_mutation_handoff_and_snapshot_nodes() {
         &super::commerce_cart_service_provider::CommerceCartRuntimeEventKind::ProviderCallSucceeded
     ));
 }
+
+#[test]
+fn cart_provider_strategy_replacement_reports_capability_gaps() {
+    let provider = CommerceCartSystemServiceProvider::mock_with_commands(["cart.read_cart"]);
+    assert!(provider
+        .capability()
+        .feature_flags
+        .contains("cart.read_cart"));
+    assert!(!provider
+        .capability()
+        .feature_flags
+        .contains("cart.handoff_request"));
+}
