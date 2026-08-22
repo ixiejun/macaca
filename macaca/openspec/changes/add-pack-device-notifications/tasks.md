@@ -24,7 +24,7 @@
 
 ## 4. Service Provider, Notification, And Interaction Strategy
 
-- [ ] 4.1 Implement the device notification service provider contract behind the service runtime; do not construct providers from kernel, SDK, shells, or generic application-framework code.
+- [x] 4.1 Implement the device notification service provider contract behind the service runtime; do not construct providers from kernel, SDK, shells, or generic application-framework code.
 - [x] 4.2 Add provider descriptor support for host-native, browser, remote-host, plugin, mock, and unavailable provider classes.
 - [ ] 4.3 Add authorization, notification lifecycle, pending schedule, and interaction subscription state machines.
 - [x] 4.4 Add mock and unavailable providers for deterministic tests; host-specific adapters must remain optional providers or plugin/remote modules.
@@ -43,9 +43,9 @@
 
 - [ ] 6.1 Emit sanitized `notifications.pack_declared`, `notifications.admission_validated`, `notifications.policy_decision`, `notifications.authorization_requested`, `notifications.authorization_changed`, `notifications.channel_registered`, `notifications.category_registered`, `notifications.notification_posted`, `notifications.notification_scheduled`, `notifications.notification_cancelled`, `notifications.interaction_received`, `notifications.badge_updated`, `notifications.command_failed`, `notifications.unavailable`, and `notifications.snapshot_recorded` events.
 - [ ] 6.2 Add replay tests proving every command and interaction event is trace-addressable through the canonical service path after refresh/restart without raw notification bodies.
-- [ ] 6.3 Add dependency-boundary gates proving microkernel, SDK, shells, and generic application framework do not import concrete notification providers or host notification APIs.
-- [ ] 6.4 Add no-direct-provider-call gates proving all notification commands enter through descriptor-owned service registrations and typed service runtime dispatch.
-- [ ] 6.5 Add redaction tests for title/body text, action input, push tokens, provider payloads, credentials, notification history, interaction events, snapshots, and diagnostics.
+- [x] 6.3 Add dependency-boundary gates proving microkernel, SDK, shells, and generic application framework do not import concrete notification providers or host notification APIs.
+- [x] 6.4 Add no-direct-provider-call gates proving all notification commands enter through descriptor-owned service registrations and typed service runtime dispatch.
+- [x] 6.5 Add redaction tests for title/body text, action input, push tokens, provider payloads, credentials, notification history, interaction events, snapshots, and diagnostics.
 - [ ] 6.6 Run `openspec validate add-pack-device-notifications --strict`, DTO compatibility tests, authorization tests, scheduling tests, interaction replay tests, boundary gates, file-size gates, and audit replay checks before marking implementation tasks complete.
 
 ## 7. Developer Documentation
