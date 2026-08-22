@@ -86,3 +86,46 @@ async fn local_files_replay_reference_is_stable_after_provider_restart() {
     assert_eq!(event.trace_id, trace_id);
     assert_eq!(event.replay_ref, format!("replay:local-files:{trace_id}"));
 }
+
+#[tokio::test]
+async fn local_files_emits_stable_audit_event_taxonomy() {
+    let provider = DeviceLocalFilesSystemServiceProvider::mock();
+    let mut events = provider.subscribe();
+    provider.start().await.unwrap();
+    for command in [
+        "local_files.request_open_handle",
+        "local_files.read",
+        "local_files.cancel_transfer",
+    ] {
+        provider
+            .call(ServiceCommand::with_trace(
+                ServiceCommandName::new(command),
+                serde_json::json!({"path":"redacted"}),
+                TraceContext::new(command),
+            ))
+            .await
+            .unwrap();
+    }
+    let mut names = Vec::new();
+    while let Ok(event) = events.try_recv() {
+        names.push(event.event_name);
+    }
+    for expected in [
+        "local_files.pack_declared",
+        "local_files.admission_validated",
+        "local_files.policy_decision",
+        "local_files.entitlement_checked",
+        "local_files.resource_reserved",
+        "local_files.picker_requested",
+        "local_files.handle_granted",
+        "local_files.transfer_started",
+        "local_files.transfer_progressed",
+        "local_files.transfer_completed",
+        "local_files.transfer_cancelled",
+    ] {
+        assert!(
+            names.iter().any(|name| name == expected),
+            "missing {expected}"
+        );
+    }
+}

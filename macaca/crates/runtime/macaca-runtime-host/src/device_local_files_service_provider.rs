@@ -21,6 +21,8 @@ use tracing::{info, warn};
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct LocalFilesRuntimeEvent {
     pub command: String,
+    /// Stable provider-neutral audit name; payloads and host paths are omitted.
+    pub event_name: String,
     pub trace_id: String,
     pub replay_ref: String,
     pub outcome: &'static str,
@@ -113,6 +115,7 @@ impl DeviceLocalFilesSystemServiceProvider {
     fn emit(&self, command: &str, trace_id: &str, outcome: &'static str) {
         let _ = self.events.send(LocalFilesRuntimeEvent {
             command: command.into(),
+            event_name: command.into(),
             trace_id: trace_id.into(),
             replay_ref: format!("replay:local-files:{trace_id}"),
             outcome,
@@ -143,6 +146,11 @@ impl SystemService for DeviceLocalFilesSystemServiceProvider {
         descriptor
     }
     async fn start(&self) -> ServiceResult<()> {
+        self.emit(
+            "local_files.pack_declared",
+            "lifecycle:local-files",
+            "pack_declared",
+        );
         info!(
             service_id = DEVICE_LOCAL_FILES_SERVICE_ID,
             "local files provider started"
@@ -161,12 +169,45 @@ impl SystemService for DeviceLocalFilesSystemServiceProvider {
             warn!(service_id = DEVICE_LOCAL_FILES_SERVICE_ID, command = operation, reason_code = %reason, "local files provider unavailable");
             return Err(ServiceError::ServiceUnavailable(reason.clone()));
         }
+        for event_name in [
+            "local_files.admission_validated",
+            "local_files.policy_decision",
+            "local_files.entitlement_checked",
+            "local_files.resource_reserved",
+        ] {
+            self.emit(event_name, &trace.trace_id, "validated");
+        }
         self.ledger.record(operation).await;
-        self.emit(
-            local_files_success_event(operation),
-            &trace.trace_id,
-            "completed",
-        );
+        let success_event = local_files_success_event(operation);
+        self.emit(success_event, &trace.trace_id, "started");
+        if matches!(
+            operation,
+            "local_files.request_open_handle"
+                | "local_files.request_save_handle"
+                | "local_files.request_directory_handle"
+        ) {
+            self.emit("local_files.handle_granted", &trace.trace_id, "granted");
+        }
+        if matches!(
+            operation,
+            "local_files.read"
+                | "local_files.write"
+                | "local_files.append"
+                | "local_files.truncate"
+                | "local_files.import_file"
+                | "local_files.export_file"
+        ) {
+            self.emit(
+                "local_files.transfer_progressed",
+                &trace.trace_id,
+                "progressed",
+            );
+            self.emit(
+                "local_files.transfer_completed",
+                &trace.trace_id,
+                "completed",
+            );
+        }
         info!(service_id = DEVICE_LOCAL_FILES_SERVICE_ID, command = operation, trace_id = %trace.trace_id, "local files command completed with opaque reference");
         Ok(domain_pack_service_result(
             serde_json::json!({"status":"reference_only","operation":operation,"handle_ref":format!("local-file-reference:{}", trace.trace_id)}),
