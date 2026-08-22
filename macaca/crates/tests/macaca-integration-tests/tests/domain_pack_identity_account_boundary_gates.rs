@@ -26,6 +26,35 @@ fn root() -> PathBuf {
         .expect("workspace root")
 }
 
+#[test]
+fn identity_account_contract_excludes_adjacent_security_and_application_workflows() {
+    let root = root();
+    let contract = fs::read_to_string(
+        root.join("crates/foundation/macaca-proto/src/domain_pack_contract/identity_account.rs"),
+    )
+    .unwrap();
+    let commands = contract
+        .lines()
+        .filter_map(|line| line.split('"').nth(1))
+        .filter(|value| value.starts_with("account."))
+        .collect::<Vec<_>>();
+    for forbidden in [
+        "auth_handoff",
+        "token_exchange",
+        "credential",
+        "mfa",
+        "profile_preference",
+        "organization_membership",
+        "tenant_policy",
+        "application_workflow",
+    ] {
+        assert!(
+            commands.iter().all(|command| !command.contains(forbidden)),
+            "account command surface must exclude {forbidden}"
+        );
+    }
+}
+
 fn files(path: &Path, output: &mut Vec<PathBuf>) {
     for entry in fs::read_dir(path).unwrap() {
         let path = entry.unwrap().path();

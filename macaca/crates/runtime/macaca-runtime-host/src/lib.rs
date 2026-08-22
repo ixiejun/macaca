@@ -103,6 +103,7 @@ pub mod graph_service_provider;
 pub(crate) mod hook_service_commands;
 pub mod hook_service_provider;
 pub mod identity_account_service_provider;
+mod identity_account_strategy;
 pub mod identity_auth_handoff_service_provider;
 pub mod identity_organization_service_provider;
 pub mod identity_profile_service_provider;

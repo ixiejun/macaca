@@ -11,6 +11,20 @@ use super::model::{DomainPackDefinition, DomainPackProviderCapabilityState};
 
 pub const IDENTITY_ACCOUNT_PACK_ID: &str = "pack.identity.account.v1";
 pub const IDENTITY_ACCOUNT_SERVICE_ID: &str = "service.identity.account";
+pub const IDENTITY_ACCOUNT_TRACE_EVENTS: &[&str] = &[
+    "account_pack_declared",
+    "account_pack_admission_validated",
+    "account_pack_policy_decision",
+    "account_pack_provider_inspected",
+    "account_pack_service_call_requested",
+    "account_pack_service_call_succeeded",
+    "account_pack_service_call_failed",
+    "account_pack_create_planned",
+    "account_pack_lifecycle_planned",
+    "account_pack_identity_link_changed",
+    "account_pack_unavailable",
+    "account_pack_snapshot_recorded",
+];
 
 pub const IDENTITY_ACCOUNT_COMMANDS: &[&str] = &[
     "account.inspect_provider",
@@ -33,7 +47,7 @@ pub const IDENTITY_ACCOUNT_COMMANDS: &[&str] = &[
     "account.get_artifact_handle",
 ];
 
-const ACCOUNT_PERMISSION_SCOPES: &[&str] = &[
+pub const IDENTITY_ACCOUNT_PERMISSION_SCOPES: &[&str] = &[
     "identity.account.read",
     "identity.account.create",
     "identity.account.update",
@@ -106,7 +120,7 @@ pub fn identity_account_pack_definition() -> DomainPackDefinition {
         sdk_slug: "account",
         service_id: IDENTITY_ACCOUNT_SERVICE_ID,
         commands: IDENTITY_ACCOUNT_COMMANDS,
-        permission_scopes: ACCOUNT_PERMISSION_SCOPES,
+        permission_scopes: IDENTITY_ACCOUNT_PERMISSION_SCOPES,
         provider_classes: ACCOUNT_PROVIDER_CLASSES,
         health_probe: "account.inspect_provider",
         unavailable_reason: "identity_account_provider_not_installed",

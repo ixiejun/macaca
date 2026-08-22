@@ -4,18 +4,21 @@
 //! composition tests. It never stores account payloads, credentials, or vendor
 //! state; concrete directory adapters remain replaceable runtime providers.
 
-use std::collections::{BTreeMap, BTreeSet};
+use std::collections::BTreeMap;
+use std::sync::Arc;
 
+use crate::identity_account_strategy::{
+    ConfiguredIdentityAccountStrategy, IdentityAccountProviderStrategy,
+};
 use async_trait::async_trait;
 use macaca_kernel::SystemService;
 use macaca_proto::domain_pack_contract::identity_account::{
     AccountProviderCapability, IDENTITY_ACCOUNT_COMMANDS, IDENTITY_ACCOUNT_PACK_ID,
-    IDENTITY_ACCOUNT_SERVICE_ID,
+    IDENTITY_ACCOUNT_SERVICE_ID, IDENTITY_ACCOUNT_TRACE_EVENTS,
 };
 use macaca_proto::{
-    domain_pack_command_trace, domain_pack_service_result, DomainPackProviderCapabilityState,
-    KernelServiceId, ServiceCommand, ServiceDescriptor, ServiceError, ServiceHealth, ServiceResult,
-    ServiceType, TraceSchemaRef,
+    domain_pack_command_trace, domain_pack_service_result, KernelServiceId, ServiceCommand,
+    ServiceDescriptor, ServiceError, ServiceHealth, ServiceResult, ServiceType, TraceSchemaRef,
 };
 use tokio::sync::{broadcast, RwLock};
 use tracing::{info, warn};
@@ -57,6 +60,7 @@ pub struct IdentityAccountSystemServiceProvider {
     events: broadcast::Sender<IdentityAccountRuntimeEvent>,
     handles: RwLock<BTreeMap<String, String>>,
     unavailable_reason: Option<String>,
+    strategy: Arc<dyn IdentityAccountProviderStrategy>,
 }
 
 impl IdentityAccountSystemServiceProvider {
@@ -70,44 +74,37 @@ impl IdentityAccountSystemServiceProvider {
         Self::new(Some(reason.into()))
     }
 
+    /// Build a synthetic provider with explicit capability gaps for admission tests.
+    pub fn mock_with_commands<I, S>(commands: I) -> Self
+    where
+        I: IntoIterator<Item = S>,
+        S: Into<String>,
+    {
+        let mut provider = Self::new(None);
+        provider.strategy = Arc::new(ConfiguredIdentityAccountStrategy::with_commands(commands));
+        provider
+    }
+
     fn new(unavailable_reason: Option<String>) -> Self {
         let (events, _) = broadcast::channel(256);
+        let strategy: Arc<dyn IdentityAccountProviderStrategy> =
+            Arc::new(if unavailable_reason.is_some() {
+                ConfiguredIdentityAccountStrategy::unavailable()
+            } else {
+                ConfiguredIdentityAccountStrategy::mock()
+            });
         Self {
             descriptor: identity_account_service_descriptor(),
             events,
             handles: RwLock::new(BTreeMap::new()),
             unavailable_reason,
+            strategy,
         }
     }
 
     /// Return declarative feature facts rather than concrete directory details.
     pub fn capability(&self) -> AccountProviderCapability {
-        AccountProviderCapability {
-            provider_class: if self.unavailable_reason.is_some() {
-                "unavailable"
-            } else {
-                "mock"
-            }
-            .into(),
-            feature_flags: IDENTITY_ACCOUNT_COMMANDS
-                .iter()
-                .map(|command| (*command).into())
-                .collect::<BTreeSet<_>>(),
-            supported_lifecycle_states: BTreeSet::from([
-                "active".into(),
-                "suspended".into(),
-                "disabled".into(),
-            ]),
-            limits: BTreeMap::from([
-                ("max_page_size".into(), 100),
-                ("max_snapshot_items".into(), 100),
-            ]),
-            state: if self.unavailable_reason.is_some() {
-                DomainPackProviderCapabilityState::Unavailable
-            } else {
-                DomainPackProviderCapabilityState::Preview
-            },
-        }
+        self.strategy.capability()
     }
 
     /// Subscribe to sanitized account lifecycle observations.
@@ -132,6 +129,13 @@ impl IdentityAccountSystemServiceProvider {
             ("provider_class".into(), "mock".into()),
             ("active_reference_count".into(), count.min(100).to_string()),
         ])
+    }
+
+    /// Explicit shutdown alias for composition roots; cleanup remains idempotent.
+    pub async fn shutdown(&self) -> ServiceResult<()> {
+        self.handles.write().await.clear();
+        info!(service_id = %self.descriptor.id, "identity account provider shutdown completed");
+        Ok(())
     }
 }
 
@@ -172,8 +176,11 @@ impl SystemService for IdentityAccountSystemServiceProvider {
             return Err(ServiceError::ServiceUnavailable(reason.clone()));
         }
         if !IDENTITY_ACCOUNT_COMMANDS.contains(&command.name.as_str()) {
-            return Err(ServiceError::UnsupportedCommand(command.name.to_string()));
+            return Err(normalize_account_error(ServiceError::UnsupportedCommand(
+                command.name.to_string(),
+            )));
         }
+        self.strategy.validate_command(command.name.as_str())?;
         if let Some(reason) = account_admission_denial(&command.payload) {
             let _ = self.events.send(event(
                 "account.policy_decision",
@@ -181,10 +188,14 @@ impl SystemService for IdentityAccountSystemServiceProvider {
                 IdentityAccountRuntimeEventKind::PolicyDecision,
                 "denied",
             ));
-            return Err(ServiceError::DisabledByPolicy(reason.into()));
+            return Err(normalize_account_error(ServiceError::DisabledByPolicy(
+                reason.into(),
+            )));
         }
         if self.handles.read().await.len() >= 100 {
-            return Err(ServiceError::DisabledByPolicy("quota_exceeded".into()));
+            return Err(normalize_account_error(ServiceError::DisabledByPolicy(
+                "quota_exceeded".into(),
+            )));
         }
 
         let handle_ref = format!("account:reference:{}", trace.trace_id);
@@ -217,12 +228,13 @@ impl SystemService for IdentityAccountSystemServiceProvider {
     }
 
     async fn stop(&self) -> ServiceResult<()> {
+        self.shutdown().await?;
         info!(service_id = %self.descriptor.id, "identity account provider stopped");
         Ok(())
     }
 
     async fn cleanup(&self) -> ServiceResult<()> {
-        self.handles.write().await.clear();
+        self.shutdown().await?;
         info!(service_id = %self.descriptor.id, "identity account provider cleanup completed");
         Ok(())
     }
@@ -285,7 +297,28 @@ pub fn identity_account_service_descriptor() -> ServiceDescriptor {
         "command_count".into(),
         IDENTITY_ACCOUNT_COMMANDS.len().to_string(),
     );
+    descriptor.metadata.insert(
+        "trace_event_count".into(),
+        IDENTITY_ACCOUNT_TRACE_EVENTS.len().to_string(),
+    );
     descriptor
+}
+
+/// Keep provider diagnostics bounded and account-owned before they cross the service boundary.
+fn normalize_account_error(error: ServiceError) -> ServiceError {
+    match error {
+        ServiceError::UnsupportedCommand(_) => {
+            ServiceError::UnsupportedCommand("account_command_unsupported".into())
+        }
+        ServiceError::DisabledByPolicy(reason) => ServiceError::DisabledByPolicy(
+            reason
+                .chars()
+                .filter(|character| character.is_ascii_alphanumeric() || *character == '_')
+                .take(64)
+                .collect(),
+        ),
+        other => other,
+    }
 }
 
 fn common_event_kinds() -> &'static [IdentityAccountRuntimeEventKind] {

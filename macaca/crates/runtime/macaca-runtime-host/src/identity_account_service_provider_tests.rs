@@ -72,6 +72,30 @@ async fn identity_account_provider_is_explicitly_unavailable_or_unsupported() {
 }
 
 #[tokio::test]
+async fn identity_account_provider_strategy_replacement_supports_capability_gaps() {
+    let provider =
+        IdentityAccountSystemServiceProvider::mock_with_commands(["account.read_account"]);
+    assert!(provider
+        .call(ServiceCommand::with_trace(
+            ServiceCommandName::new("account.read_account"),
+            serde_json::json!({}),
+            TraceContext::new("replacement-read"),
+        ))
+        .await
+        .is_ok());
+    assert!(matches!(
+        provider
+            .call(ServiceCommand::with_trace(
+                ServiceCommandName::new("account.update_account"),
+                serde_json::json!({}),
+                TraceContext::new("replacement-gap"),
+            ))
+            .await,
+        Err(ServiceError::UnsupportedCommand(code)) if code == "account_command_unsupported"
+    ));
+}
+
+#[tokio::test]
 async fn identity_account_provider_snapshot_is_bounded_and_cleanup_releases_references() {
     let provider = IdentityAccountSystemServiceProvider::mock();
     for id in ["one", "two"] {

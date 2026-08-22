@@ -12,6 +12,7 @@ use macaca_proto::{
     expand_service_capabilities, validate_audio_permission_declarations,
     validate_camera_permission_declarations, validate_filesystem_root_declarations,
     validate_host_lifecycle_permission_declarations,
+    validate_identity_account_permission_declarations,
     validate_identity_auth_handoff_permission_declarations,
     validate_identity_profile_permission_declarations, validate_key_value_namespace_declarations,
     validate_knowledge_graph_permission_declarations, validate_local_files_permission_declarations,
@@ -196,6 +197,10 @@ impl ApplicationAbiAdapter for YamlApplicationAbiAdapter {
             })?;
             validate_identity_profile_permission_declarations(service_contract).map_err(|reason| {
                 warn!(application_id = %application_id, reason, "application ABI identity profile permission admission rejected");
+                ApplicationAbiError::InvalidDeclaration(reason.into())
+            })?;
+            validate_identity_account_permission_declarations(service_contract).map_err(|reason| {
+                warn!(application_id = %application_id, reason, "identity account permission admission rejected");
                 ApplicationAbiError::InvalidDeclaration(reason.into())
             })?;
         }

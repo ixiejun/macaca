@@ -115,6 +115,7 @@ mod foundation_time_validation;
 mod foundation_validation;
 pub mod identity_account;
 mod identity_account_validation;
+mod identity_account_validation_permissions;
 pub mod identity_auth_handoff;
 mod identity_auth_handoff_validation;
 pub mod identity_common;

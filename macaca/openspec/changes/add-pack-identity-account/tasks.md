@@ -45,17 +45,17 @@
 
 ## 5. Service Provider, Provider Strategy, And Unavailable Behavior
 
-- [ ] 5.1 Add the account service provider interface with descriptor, lifecycle, health, snapshot, shutdown, timeout, cancellation, async export support, and command dispatch.
-- [ ] 5.2 Implement provider Strategy adapters behind the service interface without provider-name routing in OS-layer command logic.
-- [ ] 5.3 Implement a mock provider with synthetic accounts, identifiers, lifecycle states, linked identities, recovery references, audit references, stale-data states, and configurable capability gaps.
+- [x] 5.1 Add the account service provider interface with descriptor, lifecycle, health, snapshot, shutdown, timeout, cancellation, async export support, and command dispatch.
+- [x] 5.2 Implement provider Strategy adapters behind the service interface without provider-name routing in OS-layer command logic.
+- [x] 5.3 Implement a mock provider with synthetic accounts, identifiers, lifecycle states, linked identities, recovery references, audit references, stale-data states, and configurable capability gaps.
 - [x] 5.4 Implement an unavailable provider that returns explicit unavailable diagnostics for every command without fake success.
-- [ ] 5.5 Normalize provider errors into Macaca result envelopes while preserving sanitized provider class, bounded code, retriable flag, lifecycle state, freshness, version conflict, and replay pointer.
+- [x] 5.5 Normalize provider errors into Macaca result envelopes while preserving sanitized provider class, bounded code, retriable flag, lifecycle state, freshness, version conflict, and replay pointer.
 - [x] 5.6 Add provider capability discovery for create/update/search support, lifecycle transitions, linked identity support, recovery reference support, audit export support, schema extension support, pagination, versioning, freshness, limits, attribution, and entitlement.
 
 ## 6. SDK, Admission, Examples, And Developer Documentation
 
 - [x] 6.1 Extend pack catalog and SDK discovery for `pack.identity.account.v1` with schemas, scopes, examples, availability, health, diagnostics, compatibility, provider class, and docs metadata.
-- [ ] 6.2 Extend application admission so required declarations block on unavailable/denied states and optional declarations degrade explicitly with effective capability mementos.
+- [x] 6.2 Extend application admission so required declarations block on unavailable/denied states and optional declarations degrade explicitly with effective capability mementos.
 - [x] 6.3 Add SDK command helper builders that only construct canonical traced service calls and never construct providers.
 - [x] 6.4 Add generic app-facing examples for planning/creating accounts, reading/searching, updating metadata, lifecycle transitions, linking/unlinking identities, syncing status, setting recovery references, inspecting audit, exporting audit evidence, and handling conflicts.
 - [x] 6.5 Create `docs/developer-packs/identity/account.md` with purpose, manifest declaration, scopes, commands, DTOs, examples, unavailable diagnostics, provider replacement, trace/audit behavior, redaction, idempotency, version tokens, freshness, lifecycle semantics, linked identity semantics, and profile/auth/organization/tenant/session boundaries.
@@ -64,7 +64,7 @@
 ## 7. Trace, Audit, Replay, And Redaction
 
 - [x] 7.1 Emit sanitized declaration, admission, provider-inspection, policy, entitlement, approval, resource, service-call, create-planning, lifecycle-planning, linked-identity-change, unavailable, health, snapshot, and result events.
-- [ ] 7.2 Add trace schemas for `account_pack_declared`, `account_pack_admission_validated`, `account_pack_policy_decision`, `account_pack_provider_inspected`, `account_pack_service_call_requested`, `account_pack_service_call_succeeded`, `account_pack_service_call_failed`, `account_pack_create_planned`, `account_pack_lifecycle_planned`, `account_pack_identity_link_changed`, `account_pack_unavailable`, and `account_pack_snapshot_recorded`.
+- [x] 7.2 Add trace schemas for `account_pack_declared`, `account_pack_admission_validated`, `account_pack_policy_decision`, `account_pack_provider_inspected`, `account_pack_service_call_requested`, `account_pack_service_call_succeeded`, `account_pack_service_call_failed`, `account_pack_create_planned`, `account_pack_lifecycle_planned`, `account_pack_identity_link_changed`, `account_pack_unavailable`, and `account_pack_snapshot_recorded`.
 - [x] 7.3 Add replay tests proving every command is trace-addressable through the canonical service runtime path.
 - [x] 7.4 Add snapshot tests proving descriptor, provider health, command availability, schema/lifecycle/link/audit support, policy-template hash, redaction profile, resource counters, freshness, and replay pointers are retained without raw payload leakage.
 - [x] 7.5 Add redaction tests proving raw credentials, password hashes, reset tokens, recovery codes, MFA secrets, access tokens, refresh tokens, raw provider payloads, identity documents, and unbounded audit exports never enter logs, traces, snapshots, or SDK diagnostics.
@@ -75,8 +75,8 @@
 - [x] 8.1 Add dependency gates proving kernel, SDK, shells, and generic application framework do not import concrete account providers.
 - [x] 8.2 Add no-direct-provider-call tests proving all callable operations traverse descriptor-owned service registration and typed service commands.
 - [x] 8.3 Add canonical execution-path tests covering read-only, create, update, lifecycle transition, linked identity, status sync, recovery reference, audit export, denied, unavailable, unsupported, conflict, quota, stale-data, and redaction paths.
-- [ ] 8.4 Add provider replacement tests for built-in, plugin, remote, mock, and unavailable providers.
-- [ ] 8.5 Add boundary tests proving account commands do not perform auth handoff, token exchange, credential storage, MFA challenge execution, profile preference management, organization membership changes, tenant policy changes, or application-specific workflows.
+- [x] 8.4 Add provider replacement tests for built-in, plugin, remote, mock, and unavailable providers.
+- [x] 8.5 Add boundary tests proving account commands do not perform auth handoff, token exchange, credential storage, MFA challenge execution, profile preference management, organization membership changes, tenant policy changes, or application-specific workflows.
 - [x] 8.6 Add file-size and module-ownership checks for any new implementation files.
-- [ ] 8.7 Run `openspec validate add-pack-identity-account --strict`.
-- [ ] 8.8 Run targeted cargo checks/tests, dependency-boundary gates, audit replay checks, redaction checks, artifact-boundary checks, and account/profile/auth/organization/tenant/session boundary checks before marking implementation tasks complete.
+- [x] 8.7 Run `openspec validate add-pack-identity-account --strict`.
+- [x] 8.8 Run targeted cargo checks/tests, dependency-boundary gates, audit replay checks, redaction checks, artifact-boundary checks, and account/profile/auth/organization/tenant/session boundary checks before marking implementation tasks complete.
