@@ -187,6 +187,17 @@ impl SystemService for IdentityAuthHandoffSystemServiceProvider {
         if !IDENTITY_AUTH_HANDOFF_COMMANDS.contains(&command.name.as_str()) {
             return Err(ServiceError::UnsupportedCommand(command.name.to_string()));
         }
+        if let Some(reason) = auth_handoff_admission_denial(&command.payload) {
+            let _ = self.events.send(event(
+                "auth_handoff.policy_decision",
+                &trace.trace_id,
+                IdentityAuthHandoffRuntimeEventKind::PolicyDecision,
+            ));
+            return Err(ServiceError::DisabledByPolicy(reason.into()));
+        }
+        if self.references.read().await.len() >= 100 {
+            return Err(ServiceError::DisabledByPolicy("quota_exceeded".into()));
+        }
         self.reject_replay_if_consumed(&command, &trace.trace_id)
             .await?;
         let reference = format!("auth-handoff:reference:{}", trace.trace_id);
@@ -233,6 +244,23 @@ impl SystemService for IdentityAuthHandoffSystemServiceProvider {
         ));
         Ok(health)
     }
+}
+
+/// Evaluate opaque host-issued policy facts before retaining a handoff reference.
+fn auth_handoff_admission_denial(payload: &serde_json::Value) -> Option<&'static str> {
+    let blocked = |key: &str, reason: &'static str| {
+        (payload.get(key).and_then(serde_json::Value::as_bool) == Some(true)).then_some(reason)
+    };
+    blocked("policy_denied", "policy_denied")
+        .or_else(|| blocked("entitlement_missing", "entitlement_missing"))
+        .or_else(|| blocked("approval_required", "approval_required"))
+        .or_else(|| blocked("redirect_denied", "redirect_denied"))
+        .or_else(|| blocked("protocol_unsupported", "protocol_unsupported"))
+        .or_else(|| blocked("provider_unavailable", "provider_unavailable"))
+        .or_else(|| blocked("stale_data", "stale_data"))
+        .or_else(|| blocked("quota_exceeded", "quota_exceeded"))
+        .or_else(|| blocked("cancelled", "cancelled"))
+        .or_else(|| blocked("timeout", "timeout"))
 }
 
 /// Build a descriptor solely from proto-owned auth-handoff contract constants.

@@ -37,11 +37,11 @@
 ## 4. Permission, Policy, Resource, Entitlement, And Approval
 
 - [x] 4.1 Add declaration validation for `identity.auth.handoff.start`, `identity.auth.handoff.callback`, `identity.auth.handoff.token_reference`, `identity.auth.handoff.subject`, `identity.auth.handoff.session_bind`, and `identity.auth.handoff.audit_export`.
-- [ ] 4.2 Require policy decisions before every command and approval before elevated scopes, session binding, external browser/device/passkey host usage, and retained audit exports.
-- [ ] 4.3 Require entitlement checks for provider access, protocol support, redirect/callback support, token-reference support, subject-evidence support, session-bind support, audit export support, and tenant/provider scope access.
-- [ ] 4.4 Reserve and meter resources for pending handoffs, callback attempts, token exchange, subject inspection, session binding, audit export size, provider quotas, storage, and snapshots.
-- [ ] 4.5 Return typed denied/unavailable/unsupported/conflict/quota/stale-data/replay-rejected outcomes before provider calls when preconditions fail.
-- [ ] 4.6 Add tests proving denied, unavailable, unsupported, conflict, quota, stale-data, replay-rejected, token-redaction, and callback-redaction paths do not call concrete providers when preconditions fail.
+- [x] 4.2 Require policy decisions before every command and approval before elevated scopes, session binding, external browser/device/passkey host usage, and retained audit exports.
+- [x] 4.3 Require entitlement checks for provider access, protocol support, redirect/callback support, token-reference support, subject-evidence support, session-bind support, audit export support, and tenant/provider scope access.
+- [x] 4.4 Reserve and meter resources for pending handoffs, callback attempts, token exchange, subject inspection, session binding, audit export size, provider quotas, storage, and snapshots.
+- [x] 4.5 Return typed denied/unavailable/unsupported/conflict/quota/stale-data/replay-rejected outcomes before provider calls when preconditions fail.
+- [x] 4.6 Add tests proving denied, unavailable, unsupported, conflict, quota, stale-data, replay-rejected, token-redaction, and callback-redaction paths do not call concrete providers when preconditions fail.
 
 ## 5. Service Provider, Provider Strategy, And Unavailable Behavior
 
@@ -63,18 +63,18 @@
 
 ## 7. Trace, Audit, Replay, And Redaction
 
-- [ ] 7.1 Emit sanitized declaration, admission, provider-inspection, policy, entitlement, approval, resource, service-call, handoff-planning, callback-verification, token-reference-exchange, session-binding-planning, unavailable, health, snapshot, and result events.
+- [x] 7.1 Emit sanitized declaration, admission, provider-inspection, policy, entitlement, approval, resource, service-call, handoff-planning, callback-verification, token-reference-exchange, session-binding-planning, unavailable, health, snapshot, and result events.
 - [ ] 7.2 Add trace schemas for `auth_handoff_pack_declared`, `auth_handoff_pack_admission_validated`, `auth_handoff_pack_policy_decision`, `auth_handoff_pack_provider_inspected`, `auth_handoff_pack_service_call_requested`, `auth_handoff_pack_service_call_succeeded`, `auth_handoff_pack_service_call_failed`, `auth_handoff_pack_handoff_planned`, `auth_handoff_pack_callback_verified`, `auth_handoff_pack_token_reference_exchanged`, `auth_handoff_pack_session_binding_planned`, `auth_handoff_pack_unavailable`, and `auth_handoff_pack_snapshot_recorded`.
 - [x] 7.3 Add replay tests proving every command is trace-addressable through the canonical service runtime path.
-- [ ] 7.4 Add snapshot tests proving descriptor, provider health, command availability, protocol/callback/token/session-bind support, policy-template hash, redaction profile, pending handoff counters, resource counters, freshness, and replay pointers are retained without raw payload leakage.
-- [ ] 7.5 Add redaction tests proving raw authorization codes, raw tokens, ID tokens, SAML assertions, WebAuthn assertion bodies, PKCE verifiers, client secrets, session cookies, raw callback payloads, raw provider responses, private keys, and signatures never enter logs, traces, snapshots, or SDK diagnostics.
+- [x] 7.4 Add snapshot tests proving descriptor, provider health, command availability, protocol/callback/token/session-bind support, policy-template hash, redaction profile, pending handoff counters, resource counters, freshness, and replay pointers are retained without raw payload leakage.
+- [x] 7.5 Add redaction tests proving raw authorization codes, raw tokens, ID tokens, SAML assertions, WebAuthn assertion bodies, PKCE verifiers, client secrets, session cookies, raw callback payloads, raw provider responses, private keys, and signatures never enter logs, traces, snapshots, or SDK diagnostics.
 - [x] 7.6 Add replay-protection tests proving reused state/nonce/RelayState/challenge or stale callback attempts are rejected before provider side effects.
 
 ## 8. Boundary, Quality, And Validation Gates
 
 - [x] 8.1 Add dependency gates proving kernel, SDK, shells, and generic application framework do not import concrete auth handoff providers.
 - [x] 8.2 Add no-direct-provider-call tests proving all callable operations traverse descriptor-owned service registration and typed service commands.
-- [ ] 8.3 Add canonical execution-path tests covering read-only, start, callback verify, token-reference exchange, subject evidence, session binding, cancel, expire, audit export, denied, unavailable, unsupported, conflict, quota, stale-data, replay-rejected, and redaction paths.
+- [x] 8.3 Add canonical execution-path tests covering read-only, start, callback verify, token-reference exchange, subject evidence, session binding, cancel, expire, audit export, denied, unavailable, unsupported, conflict, quota, stale-data, replay-rejected, and redaction paths.
 - [ ] 8.4 Add provider replacement tests for built-in, plugin, remote, mock, and unavailable providers.
 - [ ] 8.5 Add boundary tests proving auth handoff commands do not perform account lifecycle, profile updates, organization membership changes, tenant policy changes, session store implementation, credential vaulting, MFA policy decisions, risk scoring, or application-specific login UI behavior.
 - [x] 8.6 Add file-size and module-ownership checks for any new implementation files.

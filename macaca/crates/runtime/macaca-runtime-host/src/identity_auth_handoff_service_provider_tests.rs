@@ -105,6 +105,35 @@ async fn auth_handoff_provider_fails_closed_and_clears_runtime_state() {
     assert_eq!(provider.snapshot().await["consumed_callback_count"], "0");
 }
 
+#[tokio::test]
+async fn auth_handoff_admission_denies_policy_facts_before_provider_state() {
+    let provider = IdentityAuthHandoffSystemServiceProvider::mock();
+    for (trace, payload) in [
+        ("policy", serde_json::json!({"policy_denied": true})),
+        (
+            "entitlement",
+            serde_json::json!({"entitlement_missing": true}),
+        ),
+        ("approval", serde_json::json!({"approval_required": true})),
+        ("redirect", serde_json::json!({"redirect_denied": true})),
+        (
+            "protocol",
+            serde_json::json!({"protocol_unsupported": true}),
+        ),
+        ("stale", serde_json::json!({"stale_data": true})),
+    ] {
+        let result = provider
+            .call(ServiceCommand::with_trace(
+                ServiceCommandName::new("auth_handoff.start_handoff"),
+                payload,
+                TraceContext::new(trace),
+            ))
+            .await;
+        assert!(matches!(result, Err(ServiceError::DisabledByPolicy(_))));
+    }
+    assert_eq!(provider.snapshot().await["active_reference_count"], "0");
+}
+
 fn command(name: &str, trace_id: &str) -> ServiceCommand {
     ServiceCommand::with_trace(
         ServiceCommandName::new(name),
