@@ -67,6 +67,7 @@ pub mod device_foreground_background_host;
 pub mod device_host_lifecycle_preflight;
 mod device_host_lifecycle_validation;
 pub mod device_local_files;
+mod device_local_files_validation;
 pub mod device_notifications;
 pub mod device_sensors;
 mod device_validation;

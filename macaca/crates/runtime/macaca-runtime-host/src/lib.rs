@@ -155,6 +155,7 @@ mod foundation_secrets_reference_audit_tests;
 mod foundation_session_state_embedded_provider_tests;
 #[cfg(test)]
 mod foundation_session_state_service_provider_tests;
+mod local_files_policy;
 #[cfg(test)]
 mod media_audio_service_provider_tests;
 #[cfg(test)]

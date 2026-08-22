@@ -16,10 +16,10 @@
 ## 3. Permission, Policy, Resource, Entitlement, And Approval
 
 - [x] 3.1 Implement declaration validation for `device.local_files.open`, `device.local_files.save`, `device.local_files.directory`, `device.local_files.read`, `device.local_files.write`, and `device.local_files.grant.manage`.
-- [ ] 3.2 Enforce picker, foreground, directory traversal, MIME/type filter, grant persistence, transfer size, content scanning, retention, and raw path redaction policies before dispatch.
+- [x] 3.2 Enforce picker, foreground, directory traversal, MIME/type filter, grant persistence, transfer size, content scanning, retention, and raw path redaction policies before dispatch.
 - [x] 3.3 Require explicit `LocalFileWritePlan` for write, append, truncate, export, and overwrite operations.
-- [ ] 3.4 Add resource reservation and quota checks for active grants, active transfers, bytes, chunks, directory entry count, traversal depth, memory, storage, retained snapshots, and replay metadata.
-- [ ] 3.5 Add approval behavior for directory grants, destructive operations, large exports/imports, delegated/remote host file access, and sensitive file categories.
+- [x] 3.4 Add resource reservation and quota checks for active grants, active transfers, bytes, chunks, directory entry count, traversal depth, memory, storage, retained snapshots, and replay metadata.
+- [x] 3.5 Add approval behavior for directory grants, destructive operations, large exports/imports, delegated/remote host file access, and sensitive file categories.
 - [x] 3.6 Add tests proving denied, unavailable, foreground-required, grant-expired, revoked, destructive-denied, directory-denied, content-scan-blocked, and quota paths do not call concrete providers or leak resources.
 
 ## 4. Service Provider, Grant, And Transfer Strategy
@@ -34,9 +34,9 @@
 ## 5. SDK, Admission, Examples, And ABI
 
 - [x] 5.1 Extend SDK discovery for `pack.device.local.files.v1` with command schemas, DTO schemas, permission scopes, examples, availability, host status, picker capabilities, grant persistence, transfer limits, diagnostics, compatibility, and documentation URL.
-- [ ] 5.2 Extend application admission so required declarations block when unavailable/disabled and optional declarations degrade explicitly with effective capability mementos.
+- [x] 5.2 Extend application admission so required declarations block when unavailable/disabled and optional declarations degrade explicitly with effective capability mementos.
 - [x] 5.3 Add SDK command helper builders that only produce canonical traced service calls and never construct providers, expose raw paths, or branch on host/platform names.
-- [ ] 5.4 Add WASM/application ABI exposure for local file commands using provider-neutral DTO schemas and canonical service-call dispatch.
+- [x] 5.4 Add WASM/application ABI exposure for local file commands using provider-neutral DTO schemas and canonical service-call dispatch.
 - [x] 5.5 Add generic examples for open handle, save handle, directory handle, read, write, import, export, revoke, and unavailable-provider diagnostics using synthetic handles and no raw host paths.
 
 ## 6. Trace, Audit, Replay, And Boundary Gates
@@ -46,7 +46,7 @@
 - [x] 6.3 Add dependency-boundary gates proving microkernel, SDK, shells, and generic application framework do not import concrete local file providers or host file APIs.
 - [x] 6.4 Add no-direct-provider-call gates proving all local file commands enter through descriptor-owned service registrations and typed service runtime dispatch.
 - [x] 6.5 Add redaction tests for raw host paths, raw file contents, file names when policy forbids them, provider payloads, credentials, transfer chunks, handles, snapshots, and diagnostics.
-- [ ] 6.6 Run `openspec validate add-pack-device-local-files --strict`, DTO compatibility tests, grant lifecycle tests, bounded transfer tests, revocation tests, boundary gates, file-size gates, and audit replay checks before marking implementation tasks complete.
+- [x] 6.6 Run `openspec validate add-pack-device-local-files --strict`, DTO compatibility tests, grant lifecycle tests, bounded transfer tests, revocation tests, boundary gates, file-size gates, and audit replay checks before marking implementation tasks complete.
 
 ## 7. Developer Documentation
 

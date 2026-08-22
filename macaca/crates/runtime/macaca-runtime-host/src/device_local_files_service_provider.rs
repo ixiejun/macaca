@@ -18,6 +18,8 @@ use macaca_proto::{
 use tokio::sync::RwLock;
 use tracing::{info, warn};
 
+use crate::local_files_policy::local_files_policy_denial;
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct LocalFilesRuntimeEvent {
     pub command: String,
@@ -226,7 +228,7 @@ impl SystemService for DeviceLocalFilesSystemServiceProvider {
         // Admission is evaluated before touching the ledger or any provider strategy.
         // Payloads are treated as provider-neutral policy facts; raw paths and bytes
         // are never inspected or copied into diagnostics.
-        if let Some(reason) = local_files_admission_denial(operation, &command.payload) {
+        if let Some(reason) = local_files_policy_denial(operation, &command.payload) {
             self.emit("local_files.policy_decision", &trace.trace_id, "denied");
             return Err(ServiceError::DisabledByPolicy(reason.into()));
         }
@@ -334,55 +336,6 @@ impl SystemService for DeviceLocalFilesSystemServiceProvider {
                 }
             }))
     }
-}
-
-fn local_files_admission_denial(
-    operation: &str,
-    payload: &serde_json::Value,
-) -> Option<&'static str> {
-    let denied = |key: &str, reason: &'static str| {
-        (payload.get(key).and_then(serde_json::Value::as_bool) == Some(true)).then_some(reason)
-    };
-    ((payload
-        .get("permission_granted")
-        .and_then(serde_json::Value::as_bool)
-        == Some(false))
-    .then_some("permission_denied"))
-    .or_else(|| denied("foreground_required", "foreground_required"))
-    .or_else(|| denied("directory_traversal", "directory_traversal_denied"))
-    .or_else(|| denied("content_scan_blocked", "content_scan_blocked"))
-    .or_else(|| denied("quota_exceeded", "quota_exceeded"))
-    .or_else(|| denied("cancelled", "transfer_cancelled"))
-    .or_else(|| {
-        (payload
-            .get("timeout_ms")
-            .and_then(serde_json::Value::as_u64)
-            == Some(0))
-        .then_some("timeout")
-    })
-    .or_else(|| {
-        (operation == "local_files.request_directory_handle"
-            && payload
-                .get("approval_required")
-                .and_then(serde_json::Value::as_bool)
-                == Some(true)
-            && payload.get("approved").and_then(serde_json::Value::as_bool) != Some(true))
-        .then_some("destructive_approval_required")
-    })
-    .or_else(|| {
-        (payload
-            .get("grant_state")
-            .and_then(serde_json::Value::as_str)
-            == Some("expired"))
-        .then_some("grant_expired")
-    })
-    .or_else(|| {
-        (payload
-            .get("grant_state")
-            .and_then(serde_json::Value::as_str)
-            == Some("revoked"))
-        .then_some("handle_revoked")
-    })
 }
 
 fn local_files_success_event(operation: &str) -> &'static str {

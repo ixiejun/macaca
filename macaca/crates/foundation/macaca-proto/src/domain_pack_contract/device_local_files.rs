@@ -30,7 +30,7 @@ pub const DEVICE_LOCAL_FILES_COMMANDS: &[&str] = &[
     "local_files.inspect_host",
 ];
 
-const LOCAL_FILES_PERMISSION_SCOPES: &[&str] = &[
+pub(crate) const LOCAL_FILES_PERMISSION_SCOPES: &[&str] = &[
     "device.local_files.open",
     "device.local_files.save",
     "device.local_files.directory",

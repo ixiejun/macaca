@@ -199,6 +199,7 @@ pub use super::device_host_lifecycle_preflight::{
     HostLifecycleLeaseState, HostLifecyclePreflightFacts, HostLifecyclePreflightFailure,
 };
 pub use super::device_host_lifecycle_validation::validate_host_lifecycle_permission_declarations;
+pub use super::device_local_files_validation::validate_local_files_permission_declarations;
 pub use super::expansion::{
     expand_service_capabilities, DomainPackEffectiveCapabilityProjection,
     EffectiveServiceCapabilities,

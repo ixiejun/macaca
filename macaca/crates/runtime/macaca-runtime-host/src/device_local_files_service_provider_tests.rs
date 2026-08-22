@@ -274,3 +274,37 @@ async fn local_files_bounds_allocations_and_reports_partial_or_cancelled_transfe
         assert!(matches!(result, Err(ServiceError::DisabledByPolicy(_))));
     }
 }
+
+#[tokio::test]
+async fn local_files_policy_checks_run_before_handle_or_transfer_reservation() {
+    let provider = DeviceLocalFilesSystemServiceProvider::mock();
+    for (command, payload, trace) in [
+        (
+            "local_files.export_file",
+            serde_json::json!({"transfer_size_bytes": 10_000_001}),
+            "size",
+        ),
+        (
+            "local_files.request_directory_handle",
+            serde_json::json!({"directory_entry_count": 1_001}),
+            "entries",
+        ),
+        (
+            "local_files.write",
+            serde_json::json!({"sensitive_category": true, "approved": false}),
+            "sensitive",
+        ),
+    ] {
+        let result = provider
+            .call(ServiceCommand::with_trace(
+                ServiceCommandName::new(command),
+                payload,
+                TraceContext::new(trace),
+            ))
+            .await;
+        assert!(matches!(result, Err(ServiceError::DisabledByPolicy(_))));
+    }
+    let snapshot = provider.snapshot().await;
+    assert_eq!(snapshot["active_handle_count"], "0");
+    assert_eq!(snapshot["active_transfer_count"], "0");
+}
