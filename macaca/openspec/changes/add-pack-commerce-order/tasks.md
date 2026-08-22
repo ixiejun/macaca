@@ -37,25 +37,25 @@
 ## 4. Permission, Policy, Resource, Entitlement, And Approval
 
 - [x] 4.1 Add declaration validation for `commerce.order.read`, `commerce.order.write`, `commerce.order.status`, `commerce.order.fulfillment_intent`, `commerce.order.cancel`, and `commerce.order.audit_export`.
-- [ ] 4.2 Require policy decisions before every command and approval before order creation, lifecycle transitions, fulfillment-intent mutation, cancellation, and retained audit exports.
-- [ ] 4.3 Require entitlement checks for provider access, creation support, status sync, fulfillment-intent support, cancellation support, return-reference support, audit export support, and store/channel access.
-- [ ] 4.4 Reserve and meter resources for order search, status sync, audit export size, provider quotas, storage, and snapshots.
-- [ ] 4.5 Return typed denied/unavailable/unsupported/conflict/quota/stale-data outcomes before provider calls when preconditions fail.
-- [ ] 4.6 Add tests proving denied, unavailable, unsupported, conflict, quota, and stale-data paths do not call concrete providers when preconditions fail.
+- [x] 4.2 Require policy decisions before every command and approval before order creation, lifecycle transitions, fulfillment-intent mutation, cancellation, and retained audit exports.
+- [x] 4.3 Require entitlement checks for provider access, creation support, status sync, fulfillment-intent support, cancellation support, return-reference support, audit export support, and store/channel access.
+- [x] 4.4 Reserve and meter resources for order search, status sync, audit export size, provider quotas, storage, and snapshots.
+- [x] 4.5 Return typed denied/unavailable/unsupported/conflict/quota/stale-data outcomes before provider calls when preconditions fail.
+- [x] 4.6 Add tests proving denied, unavailable, unsupported, conflict, quota, and stale-data paths do not call concrete providers when preconditions fail.
 
 ## 5. Service Provider, Provider Strategy, And Unavailable Behavior
 
-- [ ] 5.1 Add the order service provider interface with descriptor, lifecycle, health, snapshot, shutdown, timeout, cancellation, async export support, and command dispatch.
-- [ ] 5.2 Implement provider Strategy adapters behind the service interface without provider-name routing in OS-layer command logic.
-- [ ] 5.3 Implement a mock provider with synthetic orders, lifecycle transitions, fulfillment intents, cancellations, return references, audit exports, stale-data states, and configurable capability gaps.
+- [x] 5.1 Add the order service provider interface with descriptor, lifecycle, health, snapshot, shutdown, timeout, cancellation, async export support, and command dispatch.
+- [x] 5.2 Implement provider Strategy adapters behind the service interface without provider-name routing in OS-layer command logic.
+- [x] 5.3 Implement a mock provider with synthetic orders, lifecycle transitions, fulfillment intents, cancellations, return references, audit exports, stale-data states, and configurable capability gaps.
 - [x] 5.4 Implement an unavailable provider that returns explicit unavailable diagnostics for every command without fake success.
-- [ ] 5.5 Normalize provider errors into Macaca result envelopes while preserving sanitized provider class, bounded code, retriable flag, lifecycle state, freshness, version conflict, and replay pointer.
-- [ ] 5.6 Add provider capability discovery for source conversion, lifecycle support, cancellation support, fulfillment-intent support, return-reference support, export support, versioning, status freshness, limits, attribution, and entitlement.
+- [x] 5.5 Normalize provider errors into Macaca result envelopes while preserving sanitized provider class, bounded code, retriable flag, lifecycle state, freshness, version conflict, and replay pointer.
+- [x] 5.6 Add provider capability discovery for source conversion, lifecycle support, cancellation support, fulfillment-intent support, return-reference support, export support, versioning, status freshness, limits, attribution, and entitlement.
 
 ## 6. SDK, Admission, Examples, And Developer Documentation
 
 - [x] 6.1 Extend pack catalog and SDK discovery for `pack.commerce.order.v1` with schemas, scopes, examples, availability, health, diagnostics, compatibility, provider class, and docs metadata.
-- [ ] 6.2 Extend application admission so required declarations block on unavailable/denied states and optional declarations degrade explicitly with effective capability mementos.
+- [x] 6.2 Extend application admission so required declarations block on unavailable/denied states and optional declarations degrade explicitly with effective capability mementos.
 - [x] 6.3 Add SDK command helper builders that only construct canonical traced service calls and never construct providers.
 - [x] 6.4 Add generic app-facing examples for planning/creating orders, reading/searching orders, syncing status, planning lifecycle transitions, recording fulfillment intent, cancelling, exporting audit evidence, and handling conflicts.
 - [x] 6.5 Create `docs/developer-packs/commerce/order.md` with purpose, manifest declaration, scopes, commands, DTOs, examples, unavailable diagnostics, provider replacement, trace/audit behavior, redaction, lifecycle semantics, fulfillment-intent boundaries, and payment/receipt/inventory boundaries.
@@ -63,18 +63,18 @@
 
 ## 7. Trace, Audit, Replay, And Redaction
 
-- [ ] 7.1 Emit sanitized declaration, admission, provider-inspection, policy, entitlement, approval, resource, service-call, lifecycle-planning, fulfillment-intent-planning, unavailable, health, snapshot, and result events.
-- [ ] 7.2 Add trace schemas for `order_pack_declared`, `order_pack_admission_validated`, `order_pack_policy_decision`, `order_pack_provider_inspected`, `order_pack_service_call_requested`, `order_pack_service_call_succeeded`, `order_pack_service_call_failed`, `order_pack_lifecycle_planned`, `order_pack_fulfillment_intent_planned`, `order_pack_unavailable`, and `order_pack_snapshot_recorded`.
-- [ ] 7.3 Add replay tests proving every command is trace-addressable through the canonical service runtime path.
-- [ ] 7.4 Add snapshot tests proving descriptor, provider health, command availability, lifecycle/fulfillment/cancellation/export support, policy-template hash, redaction profile, resource counters, freshness, and replay pointers are retained without raw payload leakage.
-- [ ] 7.5 Add redaction tests proving raw buyer PII, payment credentials, raw provider payloads, labels, receipts, invoices, refund payloads, and unbounded order exports never enter logs, traces, snapshots, or SDK diagnostics.
+- [x] 7.1 Emit sanitized declaration, admission, provider-inspection, policy, entitlement, approval, resource, service-call, lifecycle-planning, fulfillment-intent-planning, unavailable, health, snapshot, and result events.
+- [x] 7.2 Add trace schemas for `order_pack_declared`, `order_pack_admission_validated`, `order_pack_policy_decision`, `order_pack_provider_inspected`, `order_pack_service_call_requested`, `order_pack_service_call_succeeded`, `order_pack_service_call_failed`, `order_pack_lifecycle_planned`, `order_pack_fulfillment_intent_planned`, `order_pack_unavailable`, and `order_pack_snapshot_recorded`.
+- [x] 7.3 Add replay tests proving every command is trace-addressable through the canonical service runtime path.
+- [x] 7.4 Add snapshot tests proving descriptor, provider health, command availability, lifecycle/fulfillment/cancellation/export support, policy-template hash, redaction profile, resource counters, freshness, and replay pointers are retained without raw payload leakage.
+- [x] 7.5 Add redaction tests proving raw buyer PII, payment credentials, raw provider payloads, labels, receipts, invoices, refund payloads, and unbounded order exports never enter logs, traces, snapshots, or SDK diagnostics.
 
 ## 8. Boundary, Quality, And Validation Gates
 
-- [ ] 8.1 Add dependency gates proving kernel, SDK, shells, and generic application framework do not import concrete order providers.
+- [x] 8.1 Add dependency gates proving kernel, SDK, shells, and generic application framework do not import concrete order providers.
 - [x] 8.2 Add no-direct-provider-call tests proving all callable operations traverse descriptor-owned service registration and typed service commands.
-- [ ] 8.3 Add canonical execution-path tests covering read-only, creation, status sync, lifecycle transition, fulfillment intent, cancellation, return references, audit export, denied, unavailable, unsupported, conflict, quota, and stale-data paths.
-- [ ] 8.4 Add provider replacement tests for built-in, plugin, remote, mock, and unavailable providers.
+- [x] 8.3 Add canonical execution-path tests covering read-only, creation, status sync, lifecycle transition, fulfillment intent, cancellation, return references, audit export, denied, unavailable, unsupported, conflict, quota, and stale-data paths.
+- [x] 8.4 Add provider replacement tests for built-in, plugin, remote, mock, and unavailable providers.
 - [x] 8.5 Add file-size and module-ownership checks for any new implementation files.
 - [x] 8.6 Run `openspec validate add-pack-commerce-order --strict`.
-- [ ] 8.7 Run targeted cargo checks/tests, dependency-boundary gates, audit replay checks, redaction checks, and order/payment/receipt/inventory boundary checks before marking implementation tasks complete.
+- [x] 8.7 Run targeted cargo checks/tests, dependency-boundary gates, audit replay checks, redaction checks, and order/payment/receipt/inventory boundary checks before marking implementation tasks complete.

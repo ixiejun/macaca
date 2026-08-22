@@ -32,6 +32,20 @@ pub const COMMERCE_ORDER_COMMANDS: &[&str] = &[
     "order.get_artifact_handle",
 ];
 
+pub const COMMERCE_ORDER_TRACE_EVENTS: &[&str] = &[
+    "order_pack_declared",
+    "order_pack_admission_validated",
+    "order_pack_policy_decision",
+    "order_pack_provider_inspected",
+    "order_pack_service_call_requested",
+    "order_pack_service_call_succeeded",
+    "order_pack_service_call_failed",
+    "order_pack_lifecycle_planned",
+    "order_pack_fulfillment_intent_planned",
+    "order_pack_unavailable",
+    "order_pack_snapshot_recorded",
+];
+
 const ORDER_PERMISSION_SCOPES: &[&str] = &[
     "commerce.order.read",
     "commerce.order.write",

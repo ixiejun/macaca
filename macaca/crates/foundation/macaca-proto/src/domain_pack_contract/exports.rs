@@ -80,7 +80,9 @@ pub use super::commerce_order::{
     OrderResultEnvelope, OrderResultStatus, OrderReturnReference, OrderScope,
     OrderSearchOrdersCommand, OrderStateTransitionRequestCommand, OrderSyncStatusCommand,
     OrderTotals, COMMERCE_ORDER_COMMANDS, COMMERCE_ORDER_PACK_ID, COMMERCE_ORDER_SERVICE_ID,
+    COMMERCE_ORDER_TRACE_EVENTS,
 };
+pub use super::commerce_order_validation_permissions::validate_commerce_order_permission_declarations;
 pub use super::commerce_payment_intent::{
     commerce_payment_intent_descriptor_hashes, commerce_payment_intent_pack_definition,
     payment_intent_stable_hash, PaymentActionRequirement, PaymentAuthorization,

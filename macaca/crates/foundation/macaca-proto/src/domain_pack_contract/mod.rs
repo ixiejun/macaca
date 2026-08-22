@@ -32,6 +32,7 @@ pub mod commerce_entitlement;
 mod commerce_entitlement_validation;
 pub mod commerce_order;
 mod commerce_order_validation;
+mod commerce_order_validation_permissions;
 pub mod commerce_payment_intent;
 mod commerce_payment_intent_validation;
 pub mod commerce_receipt;
