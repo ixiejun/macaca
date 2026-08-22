@@ -309,6 +309,39 @@ async fn lifecycle_preflight_rejects_permission_timeout_cancellation_and_quota_w
     }
 }
 
+#[tokio::test]
+async fn lifecycle_shutdown_releases_sessions_and_keeps_snapshot_bounded() {
+    let provider = DeviceHostLifecycleSystemServiceProvider::mock();
+    provider
+        .call(ServiceCommand::with_trace(
+            ServiceCommandName::new("host_lifecycle.open_foreground_session"),
+            serde_json::json!({}),
+            TraceContext::new("lifecycle-session"),
+        ))
+        .await
+        .unwrap();
+    provider
+        .call(ServiceCommand::with_trace(
+            ServiceCommandName::new("host_lifecycle.request_background_lease"),
+            serde_json::json!({}),
+            TraceContext::new("lifecycle-lease"),
+        ))
+        .await
+        .unwrap();
+    let active = provider.snapshot().await;
+    assert_eq!(active["active_foreground_session_count"], "1");
+    assert_eq!(active["active_background_lease_count"], "1");
+    assert!(format!("{active:?}").len() < 256);
+    assert!(matches!(
+        provider.health().await.unwrap(),
+        ServiceHealth::Healthy
+    ));
+    provider.stop().await.unwrap();
+    let released = provider.snapshot().await;
+    assert_eq!(released["active_foreground_session_count"], "0");
+    assert_eq!(released["active_background_lease_count"], "0");
+}
+
 async fn receive_outcome(
     events: &mut tokio::sync::broadcast::Receiver<
         super::device_host_lifecycle_service_provider::HostLifecycleRuntimeEvent,

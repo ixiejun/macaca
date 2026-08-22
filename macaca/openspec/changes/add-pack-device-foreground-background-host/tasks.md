@@ -29,7 +29,7 @@
 - [x] 4.3 Add foreground session and background lease state machines covering requested, active, throttled, suspended, closing, closed, expired, revoked, failed, and unavailable states.
 - [x] 4.4 Add mock and unavailable providers for deterministic tests; host-specific adapters must remain optional providers or plugin/remote modules.
 - [x] 4.5 Add provider conformance tests for state inspection, event subscription, foreground session open/close, background lease request/release, policy inspection, revocation, throttling, suspension, redaction, and unsupported-command reporting.
-- [ ] 4.6 Add lifecycle, health, snapshot, shutdown, timeout, cancellation, state transition, resource cleanup, and bounded output behavior.
+- [x] 4.6 Add lifecycle, health, snapshot, shutdown, timeout, cancellation, state transition, resource cleanup, and bounded output behavior.
 
 ## 5. SDK, Admission, Examples, And ABI
 
