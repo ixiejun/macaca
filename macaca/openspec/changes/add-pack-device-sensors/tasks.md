@@ -24,7 +24,7 @@
 
 ## 4. Service Provider And Stream Lease Strategy
 
-- [ ] 4.1 Implement the device sensor service provider contract behind the service runtime; do not construct providers from kernel, SDK, shells, or generic application-framework code.
+- [x] 4.1 Implement the device sensor service provider contract behind the service runtime; do not construct providers from kernel, SDK, shells, or generic application-framework code.
 - [x] 4.2 Add provider descriptor support for host-native, browser, remote, plugin, mock, and unavailable provider classes.
 - [ ] 4.3 Add a stream lease state machine covering requested, active, draining, closed, expired, revoked, failed, and unavailable states.
 - [x] 4.4 Add mock and unavailable providers for deterministic tests; external or host-specific adapters must remain optional providers or plugin/remote modules.
@@ -43,9 +43,9 @@
 
 - [ ] 6.1 Emit sanitized `sensors.pack_declared`, `sensors.admission_validated`, `sensors.policy_decision`, `sensors.entitlement_checked`, `sensors.resource_reserved`, `sensors.command_requested`, `sensors.provider_selected`, `sensors.stream_opened`, `sensors.stream_chunk_delivered`, `sensors.stream_closed`, `sensors.lease_revoked`, `sensors.command_succeeded`, `sensors.command_failed`, `sensors.unavailable`, and `sensors.snapshot_recorded` events.
 - [ ] 6.2 Add replay tests proving every command is trace-addressable through the canonical service path after refresh/restart without raw sample vectors.
-- [ ] 6.3 Add dependency-boundary gates proving microkernel, SDK, shells, and generic application framework do not import concrete sensor providers or host APIs.
+- [x] 6.3 Add dependency-boundary gates proving microkernel, SDK, shells, and generic application framework do not import concrete sensor providers or host APIs.
 - [ ] 6.4 Add no-direct-provider-call gates proving all sensor commands enter through descriptor-owned service registrations and typed service runtime dispatch.
-- [ ] 6.5 Add redaction tests for raw sample vectors, stable hardware identifiers, host API payloads, calibration details, stream chunks, lease ids, snapshots, and diagnostics.
+- [x] 6.5 Add redaction tests for raw sample vectors, stable hardware identifiers, host API payloads, calibration details, stream chunks, lease ids, snapshots, and diagnostics.
 - [ ] 6.6 Run `openspec validate add-pack-device-sensors --strict`, DTO compatibility tests, stream lifecycle tests, permission denial tests, revocation tests, boundary gates, file-size gates, and audit replay checks before marking implementation tasks complete.
 
 ## 7. Developer Documentation
